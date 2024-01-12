@@ -26,9 +26,9 @@ def get_type(elem_type):
     :return: returns numpy dtype equivalent (float32, int32, bool, string)
     """
     if elem_type == 'scalar':
-        return 'float64'
+        return 'float32'
     if elem_type == 'integer':
-        return 'int64'
+        return 'int32'
     if elem_type == 'logical':
         return 'bool'
     if elem_type == 'string':
@@ -36,29 +36,27 @@ def get_type(elem_type):
     raise TypeError(f'Type \'{elem_type}\' is not implemented')
 
 
-def dimension_picker(prefix, suffix=''):
+def dimension_picker(prefix, kernel_shape, suffix=''):
     """
     Returns the correct name for nth dimensional operator. Uses the 'kernel_shape' attribute.\n
     E.g.call: dimension_picker(op_name)(attr)
 
     :param prefix: the name of the operator (e.g. conv)
+    :param kernel_shape: Shape of the tensor to fit the operation
     :param suffix: optional suffix for ops
     :return: 'prefix`n`d' where n is the correct dimension for the kernel
     """
 
-    def _impl(attr):
-        kernel = attr["kernel_shape"]
-        if len(kernel) == 1:
-            return prefix + "1d" + suffix
-        if len(kernel) == 2:
-            return prefix + "2d" + suffix
-        if len(kernel) == 3:
-            return prefix + "3d" + suffix
-        op_name = prefix + "1d/2d/3d"
-        msg = f"Only 1D, 2D, and 3D kernels are supported for operator {op_name}."
-        raise tvm.error.OpAttributeInvalid(msg)
-
-    return _impl
+    rank = len(kernel_shape[2:])
+    if rank == 1:
+        return prefix + "1d" + suffix
+    if rank == 2:
+        return prefix + "2d" + suffix
+    if rank == 3:
+        return prefix + "3d" + suffix
+    op_name = prefix + "1d/2d/3d"
+    msg = f"Only 1D, 2D, and 3D kernels are supported for operator {op_name}."
+    raise tvm.error.OpAttributeInvalid(msg)
 
 
 def dimension_constraint():
@@ -74,6 +72,38 @@ def dimension_constraint():
         return False
 
     return _dim_check, "Only 1d, 2d and 3d kernel supported."
+
+
+def _size_conv(size):
+    if len(size) == 4:
+        # if not isinstance(size[0], tuple):
+        assert size[0] == 1 and size[1] == 1, 'Incorrect window dimensions, first two dimensions must be 1'
+        return size[2], size[3]
+    else:
+        raise ValueError(f'Unexpected window size, got {len(size)}')
+
+
+def _stride_conv(stride):
+    if len(stride) == 4:
+        assert stride[0] == 1 and stride[1] == 1, 'Incorrect stride dimensions, first two dimensions must be 1'
+        return stride[2], stride[3]
+    if len(stride) == 2:
+        return stride
+    else:
+        raise ValueError(f'Unexpected window size, got {len(stride)}')
+
+
+def _padding_conv(padding):
+    if isinstance(padding[0], (tuple, list)):
+        if len(padding) == 2:
+            # change UDLR to ULDR padding LC is faster here
+            return [x[i] for i in [0, 1] for x in padding]
+        if len(padding) == 4:
+            assert padding[0] == (0, 0) and padding[1] == (0, 0), ('Incorrect padding. '
+                                                                   'Padding on first two dimensions must be 0')
+            # itertools is faster than LC bc of splicing
+            return list(itertools.chain.from_iterable(zip(padding[2], padding[3])))
+    return padding
 
 
 def make_parameter_span(source_name_list, name_sep="."):
@@ -98,9 +128,9 @@ def _get_converter_map():
         'ceil': ndop,
         'round': ndop,
         # Binary
-        'add': add_rel_op,  # arithmetic
+        'add': add_relay_converter,  # arithmetic
         'sub': ndop,
-        'mul': mul_rel_op,
+        'mul': mul_relay_converter,
         'div': ndop,
         'pow': ndop,
         'lt': ndop,  # comparison
@@ -123,7 +153,7 @@ def _get_converter_map():
         'max': ndop,
         'clamp': ndop,
         # sliding-window
-        'conv': conv_rel_op,
+        'conv': conv_relay_converter,
         'deconv': ndop,
         'box': ndop,
         'debox': ndop,
@@ -145,11 +175,11 @@ def _get_converter_map():
         'mean_reduce': ndop,
         # tensor shape
         'reshape': ndop,
-        'squeeze': squeeze_op,
-        'unsqueeze': unsqueeze_op,
+        'squeeze': squeeze_relay_converter,
+        'unsqueeze': unsqueeze_relay_converter,
         'transpose': ndop,
         'split': ndop,
-        'concat': concatenate_op,
+        'concat': concatenate_relay_converter,
         'stack': ndop,
         'unstack': ndop,
         'slice': ndop,
@@ -162,26 +192,26 @@ def _get_converter_map():
         'avg_roi_align': ndop,
         'max_roi_align': ndop,
         # matrix multiplication
-        'matmul': matmul_rel_op,
+        'matmul': matmul_relay_converter,
         # variables
         'update': ndop,
         # Compound
         'sigmoid': ndop,  # activation
-        'relu': relu_rel_op,
+        'relu': relu_relay_converter,
         'prelu': ndop,
         'leaky_relu': ndop,
         'elu': ndop,
         'tanh': ndop,
-        'softmax': softmax_op,
+        'softmax': softmax_relay_converter,
         'softplus': ndop,
         'linear': ndop,  # linear
         'separable_conv': ndop,
         'separable_deconv': ndop,
         'max_pool_with_index': ndop,  # pooling
-        'max_pool': max_pool_op,
-        'avg_pool': avg_pool_op,
+        'max_pool': max_pool_relay_converter,
+        'avg_pool': avg_pool_relay_converter,
         'rms_pool': ndop,
-        'local_response_normalization': lrn_op,  # normalization
+        'local_response_normalization': lrn_relay_converter,  # normalization
         'local_mean_normalization': ndop,
         'local_variance_normalization': ndop,
         'local_contrast_normalization': ndop,
@@ -208,35 +238,81 @@ def ndop(*args, **kwargs):  # TODO not implemented ops
 
 #   # Binary ops
 
-def add_rel_op(lhs, rhs):
+def add_relay_converter(lhs, rhs):
+    sl, sr = infer_shape(lhs), infer_shape(rhs)
     return get_relay_op('add')(lhs, rhs)
 
 
-def mul_rel_op(lhs, rhs):
+def mul_relay_converter(lhs, rhs):
     return get_relay_op('multiply')(lhs, rhs)
 
 
 #   # Select op
 #   # Simplifier ops
 #   # Sliding-window ops
-def conv_rel_op(data,
-                kernel,
-                bias,
-                stride,
-                padding,
-                dilation,
-                groups,
-                border):
-    pass  # TODO
+def conv_relay_converter(data,
+                         kernel,
+                         bias,
+                         stride,
+                         padding,
+                         dilation,
+                         groups,
+                         border):
+    if border != 'constant':
+        print(f'Currently {border} border is not supported, used `constant` border')
+
+    kernel_shape = infer_shape(kernel)
+    strides = _stride_conv(stride)
+    if padding:
+        pad = _padding_conv(padding)
+    else:
+        # TODO NNEF automatic padding calculator
+        pad = (0, 0, 1, 1)  # seems like good default but WIP
+
+    channels = kernel_shape[0]
+
+    if not stride:
+        strides = (1, 1)
+
+    if not dilation:
+        dilation = (1, 1)
+
+    op = get_relay_op(dimension_picker('conv', kernel_shape))
+    conv_out = op(
+        data=data,
+        weight=kernel,
+        strides=strides,
+        padding=pad,
+        dilation=dilation,
+        groups=groups,
+        channels=channels,
+        kernel_size=kernel_shape[2:],
+        # #defs
+        data_layout="NCHW",
+        kernel_layout="OIHW",
+        out_layout="",
+        out_dtype=""
+    )
+
+    res = None
+    if isinstance(bias, _expr.Constant):
+        if bias.data.numpy() == np.array([0.0]):
+            res = conv_out
+
+    if not res:
+        # squeeze needed bc nnef has bias [1, channel]
+        res = _op.nn.bias_add(conv_out, relay.squeeze(bias, axis=0))
+
+    return res
 
 
 #   # Reduce ops
 #   # Tensor shape ops
-def squeeze_op(data, axes):
+def squeeze_relay_converter(data, axes):
     return relay.squeeze(data, axes)
 
 
-def unsqueeze_op(data, axes):
+def unsqueeze_relay_converter(data, axes):
     # TODO testing how axes is built up
     axes = sorted(axes)
     for axis in axes:
@@ -246,16 +322,17 @@ def unsqueeze_op(data, axes):
     return data
 
 
-def concatenate_op(*data, axis):
+def concatenate_relay_converter(*data, axis):
     return relay.concatenate(data, axis)
 
 
 #   # Region-of-interest ops
 #   # Matrix multiplication
-def matmul_rel_op(a, b):
+def matmul_relay_converter(a, b, transposeA, transposeB):
     """
-    Matmul using `dense` for 2D and `batch_matmul` for higher (TODO)
+    Matmul using `dense` for 2D and `batch_matmul` for higher
     """
+    # TODO batch matmul
     # a_shape = infer_shape(a)
     # a_ndims = len(a_shape)
     #
@@ -265,7 +342,7 @@ def matmul_rel_op(a, b):
     # # TODO? check sizes
     #
 
-    out = _op.nn.dense(a, _op.transpose(b))
+    out = _op.nn.matmul(a, b, transpose_a=transposeA, transpose_b=transposeB)
 
     return out
 
@@ -273,57 +350,101 @@ def matmul_rel_op(a, b):
 #   # Variable updates
 #   # Compound ops
 
-def relu_rel_op(data):
+def relu_relay_converter(data):
     return get_relay_op('relu')(data)
 
 
-def softmax_op(data, axes):
+def softmax_relay_converter(data, axes):
     if len(axes) > 1:
         print('Multiple axes not supported, operation has been done along the first axis in axes.')
     axis = axes[0]
+
+    s = infer_shape(data)
+
     return get_relay_op('softmax')(data, axis)
 
 
-def max_pool_op(data,
-                size,
-                border,
-                padding,
-                stride,
-                dilation):
-    pass
+def max_pool_relay_converter(data,
+                             size,
+                             border,
+                             padding,
+                             stride,
+                             dilation):
+    # attr convs
+    pool_size = _size_conv(size)
+    strides = _stride_conv(stride)
+    pad = _padding_conv(padding)
+
+    op = get_relay_op(dimension_picker('max_pool', infer_shape(data)))
+    return op(data,
+              pool_size=pool_size,
+              strides=strides,
+              dilation=dilation,
+              padding=pad,
+              # #defs
+              layout="NCHW",
+              out_layout="",
+              ceil_mode=False
+              )
 
 
-def avg_pool_op(data,
-                size,
-                border,
-                padding,
-                stride,
-                dilation):
-    pass
+def avg_pool_relay_converter(data,
+                             size,
+                             border,
+                             padding,
+                             stride,
+                             dilation):
+    pool_size = _size_conv(size)
+    strides = _stride_conv(stride)
+    pad = _padding_conv(padding)
+
+    op = get_relay_op(dimension_picker('avg_pool', infer_shape(data)))
+    return op(data,
+              pool_size=pool_size,
+              strides=strides,
+              dilation=dilation,
+              padding=pad,
+              # #defs
+              layout="NCHW",
+              out_layout="",
+              ceil_mode=False,
+              count_include_pad=False
+              )
 
 
-def lrn_op(data,
-           size,
-           alpha,
-           beta,
-           bias):
-    pass
+def lrn_relay_converter(data,
+                        size,
+                        alpha,
+                        beta,
+                        bias):
+    axis = [i for i in range(len(size)) if size[i] > 1]
+    if len(axis) == 1:
+        axis = axis[0]
+    else:
+        print("Multi axis LRN is not implemented properly, using axis = 1")
+        axis = 1
+    size = size[axis]
+    return get_relay_op('lrn')(data,
+                               size,
+                               axis,
+                               bias,
+                               alpha,
+                               beta)
 
 
 #   # Misc ops
 
 
-# Parser class
-class NNEF_Parser:
+# Converter class
+class NNEF_Converter:
 
-    def __init__(self, root_dir):
+    def __init__(self):
         self._nodes = {}
         self._consts = {}
         self._inputs = {}
         self._num_inputs = 0
         self._params = {}
         self._num_params = 0
-        self._rootdir = root_dir
 
     def from_nnef(self, graph):
         self._parse_inputs(graph)
@@ -338,7 +459,7 @@ class NNEF_Parser:
         for i_name in self._params.keys():
             if i_name in free_vars and i_name not in self._inputs:
                 self._inputs[i_name] = self._nodes[i_name]
-        func = function.Function(self._inputs.values(), outputs)
+        func = function.Function(list(self._inputs.values()), outputs)
         return IRModule.from_expr(func), self._params
 
     def _parse_inputs(self, graph: nnef.Graph):
@@ -361,8 +482,7 @@ class NNEF_Parser:
             if op.name == 'variable':
                 # TODO convert params to const, or leave variable (freeze vars switch)
                 i_tens = graph.tensors[op.outputs['output']]
-                with open(os.path.join(self._rootdir, op.attribs['label'] + '.dat')) as f:
-                    tens_data = tvm.runtime.ndarray.array(nnef.read_tensor(f))
+                tens_data = i_tens.data
                 self._nodes[i_tens.name] = new_var(i_tens.name, shape=op.attribs['shape'],
                                                    dtype=get_type(i_tens.dtype))
                 self._params[i_tens.name] = tens_data
@@ -372,8 +492,8 @@ class NNEF_Parser:
                 self._set_literal_inputs(op)
                 self._set_parameter_span(op, op.name)
                 inputs = []
-                for ink, inv in op.inputs.items():  # TODO handle default values, without identifier
-                    # Extension for list input paramters
+                for ink, inv in op.inputs.items():  # TODO DONE handle default values, without identifier
+                    # Extension for list input parameters
                     if isinstance(inv, list):
                         for i, linv in enumerate(inv):
                             if linv in self._nodes.keys():
@@ -383,7 +503,7 @@ class NNEF_Parser:
                                 if name in self._nodes.keys():
                                     inputs.append(self._nodes[name])
                                 else:
-                                    print('Invalid input node for op')
+                                    print(f'Invalid input node for {op.name}')
                     else:
                         if inv in self._nodes.keys():
                             inputs.append(self._nodes[inv])
@@ -435,7 +555,8 @@ class NNEF_Parser:
                         self._nodes[f'{node.name}_{k}'] = _expr.const(np.array(ve, dtype=get_type(node.dtype)))
             else:
                 if v not in self._nodes.keys():
-                    self._nodes[f'{node.name}_{k}'] = _expr.const(np.array(v, dtype=get_type(node.dtype)))
+                    dtype = 'float32' if not node.dtype else get_type(node.dtype)
+                    self._nodes[f'{node.name}_{k}'] = _expr.const(np.array(v, dtype=dtype))
 
     def _set_parameter_span(self, node, node_source_name):
         for k, name in node.inputs.items():
@@ -469,11 +590,9 @@ def from_nnef(
         model_path: os.PathLike | str
 ):
     """
-
-    :param model_path:
     :return: (mod, params) : (tvm.IRModule, dict of str and tvm.nd.NDArray)
     """
-    par = NNEF_Parser(model_path)
-    model = nnef.load_graph(os.path.join(model_path, 'graph.nnef'))
+    par = NNEF_Converter()
+    model = nnef.load_graph(model_path)
     nnef.infer_shapes(model)
     return par.from_nnef(graph=model)
