@@ -110,23 +110,29 @@ def make_parameter_span(source_name_list, name_sep="."):
     return name_sep.join(source_name_list)
 
 
+def __unexpected_attrs(op: str, kwargs: dict) -> None:
+    print(f'{op} received unexpected attributes(s), possibly mismatched versions. Attributes(s) ignored:')
+    for k, v in kwargs.items():
+        print(f'\t{k} := {v}')
+
+
 # Conversion map, operator functions
 
 def _get_converter_map():
     return {  # Unary
-        'copy': ndop,  # arithmetic
-        'neg': ndop,
-        'rcp': ndop,
-        'exp': ndop,
-        'log': ndop,
-        'sin': ndop,
-        'cos': ndop,
-        'abs': ndop,
-        'sign': ndop,
-        'not': ndop,  # logical
-        'floor': ndop,  # rounding
-        'ceil': ndop,
-        'round': ndop,
+        'copy': copy_relay_converter,  # arithmetic
+        'neg': neg_relay_converter,
+        'rcp': rcp_relay_converter,
+        'exp': exp_relay_converter,
+        'log': log_relay_converter,
+        'sin': sin_relay_converter,
+        'cos': cos_relay_converter,
+        'abs': abs_relay_converter,
+        'sign': sign_relay_converter,
+        'not': not_relay_converter,  # logical
+        'floor': floor_relay_converter,  # rounding
+        'ceil': ceil_relay_converter,
+        'round': round_relay_converter,
         # Binary
         'add': add_relay_converter,  # arithmetic
         'sub': ndop,
@@ -236,10 +242,117 @@ def ndop(*args, **kwargs):  # TODO not implemented ops
 #   # Unary ops
 
 
+def copy_relay_converter(data,
+                         **kwargs):
+    if kwargs:
+        __unexpected_attrs('copy', kwargs)
+
+    return get_relay_op('copy')(data)
+
+
+def neg_relay_converter(data,
+                        **kwargs):
+    if kwargs:
+        __unexpected_attrs('neg', kwargs)
+
+    return get_relay_op('negative')(data)
+
+
+def rcp_relay_converter(data,
+                        **kwargs):
+    if kwargs:
+        __unexpected_attrs('rcp', kwargs)
+
+    raise NotImplementedError('There is no equivalent tp rcp in Relay, TODO in cpp side')
+
+
+def exp_relay_converter(data,
+                        **kwargs):
+    if kwargs:
+        __unexpected_attrs('exp', kwargs)
+
+    return get_relay_op('exp')(data)
+
+
+def log_relay_converter(data,
+                        **kwargs):
+    if kwargs:
+        __unexpected_attrs('log', kwargs)
+
+    return get_relay_op('log')(data)
+
+
+def sin_relay_converter(data,
+                        **kwargs):
+    if kwargs:
+        __unexpected_attrs('sin', kwargs)
+
+    return get_relay_op('sin')(data)
+
+
+def cos_relay_converter(data,
+                        **kwargs):
+    if kwargs:
+        __unexpected_attrs('cos', kwargs)
+
+    return get_relay_op('cos')(data)
+
+
+def abs_relay_converter(data,
+                        **kwargs):
+    if kwargs:
+        __unexpected_attrs('abs', kwargs)
+
+    return get_relay_op('abs')(data)
+
+
+def sign_relay_converter(data,
+                         **kwargs):
+    if kwargs:
+        __unexpected_attrs('sign', kwargs)
+
+    return get_relay_op('sign')(data)
+
+
+def not_relay_converter(data,
+                        **kwargs):
+    if kwargs:
+        __unexpected_attrs('not', kwargs)
+
+    return get_relay_op('logical_not')(data)
+
+
+def floor_relay_converter(data,
+                          **kwargs):
+    if kwargs:
+        __unexpected_attrs('floor', kwargs)
+
+    return get_relay_op('floor')(data)
+
+
+def ceil_relay_converter(data,
+                         **kwargs):
+    if kwargs:
+        __unexpected_attrs('ceil', kwargs)
+
+    return get_relay_op('ceil')(data)
+
+
+def round_relay_converter(data,
+                          **kwargs):
+    if kwargs:
+        __unexpected_attrs('round', kwargs)
+
+    return get_relay_op('round')(data)
+
+
 #   # Binary ops
 
-def add_relay_converter(lhs, rhs):
-    sl, sr = infer_shape(lhs), infer_shape(rhs)
+def add_relay_converter(lhs, rhs,
+                        **kwargs):
+    if kwargs:
+        __unexpected_attrs('add', kwargs)
+
     return get_relay_op('add')(lhs, rhs)
 
 
