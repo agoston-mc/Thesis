@@ -135,20 +135,20 @@ def _get_converter_map():
         'round': round_relay_converter,
         # Binary
         'add': add_relay_converter,  # arithmetic
-        'sub': ndop,
+        'sub': sub_relay_converter,
         'mul': mul_relay_converter,
-        'div': ndop,
-        'pow': ndop,
-        'lt': ndop,  # comparison
-        'gt': ndop,
-        'le': ndop,
-        'ge': ndop,
-        'eq': ndop,
-        'ne': ndop,
-        'and': ndop,  # logical
-        'or': ndop,
+        'div': div_relay_converter,
+        'pow': pow_relay_converter,
+        'lt': lt_relay_converter,  # comparison
+        'gt': gt_relay_converter,
+        'le': le_relay_converter,
+        'ge': ge_relay_converter,
+        'eq': eq_relay_converter,
+        'ne': ne_relay_converter,
+        'and': and_relay_converter,  # logical
+        'or': or_relay_converter,
         # select
-        'select': ndop,
+        'select': select_relay_converter,
         # simplifier
         'sqr': ndop,
         'sqrt': ndop,
@@ -356,12 +356,115 @@ def add_relay_converter(lhs, rhs,
     return get_relay_op('add')(lhs, rhs)
 
 
-def mul_relay_converter(lhs, rhs):
+def sub_relay_converter(lhs, rhs,
+                        **kwargs):
+    if kwargs:
+        __unexpected_attrs('sub', kwargs)
+
+    return get_relay_op('subtract')(lhs, rhs)
+
+
+def mul_relay_converter(lhs, rhs,
+                        **kwargs):
+    if kwargs:
+        __unexpected_attrs('mul', kwargs)
+
     return get_relay_op('multiply')(lhs, rhs)
 
 
+def div_relay_converter(lhs, rhs,
+                        **kwargs):
+    if kwargs:
+        __unexpected_attrs('div', kwargs)
+
+    return get_relay_op('divide')(lhs, rhs)
+
+
+def pow_relay_converter(lhs, rhs,
+                        **kwargs):
+    if kwargs:
+        __unexpected_attrs('pow', kwargs)
+
+    return get_relay_op('power')(lhs, rhs)
+
+
+def lt_relay_converter(lhs, rhs,
+                       **kwargs):
+    if kwargs:
+        __unexpected_attrs('lt', kwargs)
+
+    return get_relay_op('less')(lhs, rhs)
+
+
+def gt_relay_converter(lhs, rhs,
+                       **kwargs):
+    if kwargs:
+        __unexpected_attrs('gt', kwargs)
+
+    return get_relay_op('greater')(lhs, rhs)
+
+
+def le_relay_converter(lhs, rhs,
+                       **kwargs):
+    if kwargs:
+        __unexpected_attrs('le', kwargs)
+
+    return get_relay_op('less_equal')(lhs, rhs)
+
+
+def ge_relay_converter(lhs, rhs,
+                       **kwargs):
+    if kwargs:
+        __unexpected_attrs('ge', kwargs)
+
+    return get_relay_op('greater_equal')(lhs, rhs)
+
+
+def eq_relay_converter(lhs, rhs,
+                       **kwargs):
+    if kwargs:
+        __unexpected_attrs('eq', kwargs)
+
+    return get_relay_op('equal')(lhs, rhs)
+
+
+def ne_relay_converter(lhs, rhs,
+                       **kwargs):
+    if kwargs:
+        __unexpected_attrs('ne', kwargs)
+
+    return get_relay_op('not_equal')(lhs, rhs)
+
+
+def and_relay_converter(lhs, rhs,
+                        **kwargs):
+    if kwargs:
+        __unexpected_attrs('and', kwargs)
+
+    return get_relay_op('logical_and')(lhs, rhs)
+
+
+def or_relay_converter(lhs, rhs,
+                       **kwargs):
+    if kwargs:
+        __unexpected_attrs('or', kwargs)
+
+    return get_relay_op('logical_or')(lhs, rhs)
+
+
 #   # Select op
+
+def select_relay_converter(condition, t_val, f_val,
+                           **kwargs):
+    if kwargs:
+        __unexpected_attrs('or', kwargs)
+
+    get_relay_op('where')(condition, t_val, f_val)
+    pass
+
+
 #   # Simplifier ops
+# # TODO skipped
 #   # Sliding-window ops
 def conv_relay_converter(data,
                          kernel,
