@@ -224,10 +224,10 @@ def _get_converter_map():
         'unsqueeze': unsqueeze_converter,
         'transpose': transpose_converter,
         'split': split_converter,
-        'concat': concatenate_converter,
-        'stack': ndop,
+        'concat': concat_converter,
+        'stack': stack_covnerter,
         'unstack': ndop,
-        'slice': ndop,
+        'slice': slice_converter,
         'pad': ndop,
         'tile': ndop,
         # region-of-interest
@@ -917,7 +917,7 @@ def split_converter(data,
                     ratios,
                     **kwargs):
     if kwargs:
-        __unexpected_attrs('mean_reduce', kwargs)
+        __unexpected_attrs('split', kwargs)
 
     axis_len = infer_shape(data)[axis]
     rat_mul = axis_len / sum(ratios)
@@ -933,16 +933,81 @@ def split_converter(data,
     return get_relay_op('split')(data, indices, axis)
 
 
-def concatenate_converter(*data, axis):
-    return relay.concatenate(data, axis)
+def concat_converter(data,
+                     axis,
+                     **kwargs):
+    if kwargs:
+        __unexpected_attrs('concat', kwargs)
+
+    return get_relay_op('concatenate')(data, axis)
+
+
+def stack_covnerter(data,
+                    axis,
+                    **kwargs):
+    if kwargs:
+        __unexpected_attrs('stack', kwargs)
+
+    return get_relay_op('stack')(data, axis)
+
+
+# TODO unstack
+
+
+def slice_converter(data,
+                    axes,
+                    begin,
+                    end,
+                    **kwargs):
+    if kwargs:
+        __unexpected_attrs('slice', kwargs)
+
+    # Needs manual stride overwrite because TVM slice breaks at multiple axes,
+    # TODO?? check with TVM
+    stride = [1]*len(axes)
+
+    return get_relay_op('strided_slice')(data, begin, end, strides=stride, axes=axes)
+
+
+def pad_converter(data,
+                  padding,
+                  border,
+                  value,
+                  **kwargs):
+    if kwargs:
+        __unexpected_attrs('pad', kwargs)
+
+    if border not in ['constant', 'replicate', 'reflect']:
+        print(f'{border} border type is not supported in padding. Assumed constant')
+        border = 'constant'
+    if border == 'replicate':
+        border = 'edge'
+
+    return get_relay_op('pad')(data, padding, value, border)
+
+
+def tile_converter(data,
+                   repeats,
+                   **kwargs):
+    if kwargs:
+        __unexpected_attrs('tile', kwargs)
+
+    return get_relay_op('tile')(data, repeats)
 
 
 #   # Region-of-interest ops
+
+# TODO roi pools ??
+
+
 #   # Matrix multiplication
-def matmul_converter(a, b, transposeA, transposeB):
+def matmul_converter(a, b, transposeA, transposeB, **kwargs):
     """
     Matmul using `dense` for 2D and `batch_matmul` for higher
     """
+    if kwargs:
+        __unexpected_attrs('matmul', kwargs)
+
     # TODO batch matmul
     # a_shape = infer_shape(a)
     # a_ndims = len(a_shape)
@@ -960,6 +1025,12 @@ def matmul_converter(a, b, transposeA, transposeB):
 
 #   # Variable updates
 #   # Compound ops
+
+
+def sigmoid_converter(data,
+                      **kwargs):
+
+
 
 def relu_converter(data):
     return get_relay_op('relu')(data)
