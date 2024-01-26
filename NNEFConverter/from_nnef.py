@@ -210,20 +210,20 @@ def _get_converter_map():
         'nearest_upsample': nearest_upsample_converter,
         'multilinear_upsample': multilinear_upsample_converter,
         # reduce
-        'sum_reduce': ndop,
-        'max_reduce': ndop,
-        'min_reduce': ndop,
-        'argmax_reduce': ndop,
-        'argmin_reduce': ndop,
-        'all_reduce': ndop,
-        'any_reduce': ndop,
-        'mean_reduce': ndop,
+        'sum_reduce': sum_reduce_converter,
+        'max_reduce': max_reduce_converter,
+        'min_reduce': min_reduce_converter,
+        'argmax_reduce': argmax_reduce_converter,
+        'argmin_reduce': argmin_reduce_converter,
+        'all_reduce': all_reduce_converter,
+        'any_reduce': any_reduce_converter,
+        'mean_reduce': mean_reduce_converter,
         # tensor shape
-        'reshape': ndop,
+        'reshape': reshape_converter,
         'squeeze': squeeze_converter,
         'unsqueeze': unsqueeze_converter,
-        'transpose': ndop,
-        'split': ndop,
+        'transpose': transpose_converter,
+        'split': split_converter,
         'concat': concatenate_converter,
         'stack': ndop,
         'unstack': ndop,
@@ -668,10 +668,10 @@ def deconv_converter(data,
     else:
         # autopad is not usable here, manually calculate the padding
         data_sh = infer_shape(data)[2:]
-        out_sh = [(ui + (s - 1)) // s for ui, s in zip(data_sh, stride)]
+        out_sh = output_shape[2:]  # [(ui + (s - 1)) // s for ui, s in zip(data_sh, strides)]
         dilated = [(f - 1) * d + 1 for f, d in zip(kernel_shape[2:], dilation)]
         total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in
-                 zip(out_sh, stride, dilated, data_sh)]
+                 zip(out_sh, strides, dilated, data_sh)]
 
         pad = _padding_conv([(pad // 2, (pad + 1) // 2) for pad in total], rank)
 
@@ -752,7 +752,7 @@ def nearest_upsample_converter(data,
     rank = len(infer_shape(data))
 
     if rank == 3:
-        raise ValueError('wrong dim')
+        raise tvm.error.OpError('Upsampling on 1D tensor is not supported by TVM')
     if rank == 4:
         return get_relay_op('upsampling')(data, factor[0], factor[1], method='nearest_neighbor')
     if rank == 5:
@@ -774,7 +774,7 @@ def multilinear_upsample_converter(data,
     rank = len(infer_shape(data))
 
     if rank == 3:
-        raise ValueError('wrong dim')
+        raise tvm.error.OpError('Upsampling on 1D tensor is not supported by TVM')
     if rank == 4:
         return get_relay_op('upsampling')(data, factor[0], factor[1], method='bilinear')
     if rank == 5:
@@ -784,12 +784,116 @@ def multilinear_upsample_converter(data,
 
 
 #   # Reduce ops
+
+def sum_reduce_converter(data,
+                         axes,
+                         normalize,
+                         **kwargs):
+    if kwargs:
+        __unexpected_attrs('sum_reduce', kwargs)
+
+    out = get_relay_op('sum')(data, axes)
+
+    if normalize:
+        # TODO?? ask normalization value epsilon?
+        return get_relay_op('l2_normalize')(out, 0, [x - 2 for x in axes])
+    return out
+
+
+def max_reduce_converter(data,
+                         axes,
+                         **kwargs):
+    if kwargs:
+        __unexpected_attrs('max_reduce', kwargs)
+
+    return get_relay_op('max')(data, axes)
+
+
+def min_reduce_converter(data,
+                         axes,
+                         **kwargs):
+    if kwargs:
+        __unexpected_attrs('min_reduce', kwargs)
+
+    return get_relay_op('min')(data, axes)
+
+
+def argmax_reduce_converter(data,
+                            axes,
+                            **kwargs):
+    if kwargs:
+        __unexpected_attrs('argmax_reduce', kwargs)
+
+    return get_relay_op('argmax')(data, axes)
+
+
+def argmin_reduce_converter(data,
+                            axes,
+                            **kwargs):
+    if kwargs:
+        __unexpected_attrs('argmin_reduce', kwargs)
+
+    return get_relay_op('argmin')(data, axes)
+
+
+def all_reduce_converter(data,
+                         axes,
+                         **kwargs):
+    if kwargs:
+        __unexpected_attrs('all_reduce', kwargs)
+
+    return get_relay_op('all')(data, axes)
+
+
+def any_reduce_converter(data,
+                         axes,
+                         **kwargs):
+    if kwargs:
+        __unexpected_attrs('any_reduce', kwargs)
+
+    return get_relay_op('any')(data, axes)
+
+
+def mean_reduce_converter(data,
+                          axes,
+                          **kwargs):
+    if kwargs:
+        __unexpected_attrs('mean_reduce', kwargs)
+
+    return get_relay_op('mean')(data, axes)
+
+
 #   # Tensor shape ops
-def squeeze_converter(data, axes):
+
+def reshape_converter(data,
+                      shape,
+                      axis_start,
+                      axis_count,
+                      **kwargs):
+    if kwargs:
+        __unexpected_attrs('reshape', kwargs)
+
+    dshape = list(infer_shape(data))
+    if axis_count == -1:
+        newshape = dshape[:axis_start] + shape
+    else:
+        suffix_len = len(dshape) - len(shape) - axis_start + 1
+        newshape = dshape[:axis_start] + shape + dshape[- suffix_len:]
+
+    return get_relay_op('reshape')(data, newshape)
+
+
+def squeeze_converter(data, axes,
+                      **kwargs):
+    if kwargs:
+        __unexpected_attrs('squeeze', kwargs)
     return relay.squeeze(data, axes)
 
 
-def unsqueeze_converter(data, axes):
+def unsqueeze_converter(data, axes,
+                        **kwargs):
+    if kwargs:
+        __unexpected_attrs('unsqueeze', kwargs)
     # TODO testing how axes is built up
     axes = sorted(axes)
     for axis in axes:
@@ -797,6 +901,36 @@ def unsqueeze_converter(data, axes):
             axis = len(data.type_annotation.concrete_shape) + len(axes) + axis
         data = _op.expand_dims(data, axis=axis, num_newaxis=1)
     return data
+
+
+def transpose_converter(data,
+                        axes,
+                        **kwargs):
+    if kwargs:
+        __unexpected_attrs('transpose', kwargs)
+
+    return get_relay_op('transpose')(data, axes)
+
+
+def split_converter(data,
+                    axis,
+                    ratios,
+                    **kwargs):
+    if kwargs:
+        __unexpected_attrs('mean_reduce', kwargs)
+
+    axis_len = infer_shape(data)[axis]
+    rat_mul = axis_len / sum(ratios)
+    ratio_list = [(r * rat_mul) for r in ratios]
+
+    s = 0
+    indices = []
+    for r in ratio_list[:-1]:
+        s += r
+        # Strinctly needs int ...
+        indices.append(int(s))
+
+    return get_relay_op('split')(data, indices, axis)
 
 
 def concatenate_converter(*data, axis):
@@ -997,16 +1131,28 @@ class NNEF_Converter:
                     outputs_num = len(converted)
 
                 if outputs_num == 1:
-                    converted = fold_constant(converted)
+                    if not isinstance(converted, _expr.TupleWrapper):
+                        converted = fold_constant(converted)
+                    else:
+                        converted = fold_constant(converted.astuple())
                 else:
                     converted = _expr.TupleWrapper(fold_constant(converted.astuple()), len(converted))
 
                 converted = set_span(converted, op.name)
 
                 if outputs_num == 1:
-                    self._nodes[list(op.outputs.values())[0]] = converted
+                    # check if the singular ret val is a list of only one element
+                    ret_val = list(op.outputs.values())[0]
+                    if isinstance(ret_val, list):
+                        self._nodes[ret_val[0]] = converted
+                    else:
+                        self._nodes[ret_val] = converted
                 else:
-                    raise NotImplementedError(f'Multiple outputs are not supported. Raised by {op.name}.')
+                    for i, out in zip(range(outputs_num), op.outputs['values']):
+                        self._nodes[out] = converted[i]
+                    # pass
+
+                    # raise NotImplementedError(f'Multiple outputs are not supported. Raised by {op.name}.')
                     # node_output = None
                     # for k, i in zip(list(node_output), range(len(node_output))):
                     #     self._nodes[k] = op[i]
