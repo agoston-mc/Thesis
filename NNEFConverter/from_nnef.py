@@ -747,8 +747,10 @@ def box_converter(data,
 
     leave_out_dims = len([x for x in size if x == 1])
 
+    # generate widows
     sw = get_relay_op('sliding_window')(data, leave_out_dims, size[leave_out_dims:], strides[leave_out_dims:])
-    axes = [len(dshape)+ x for x in range(len(dshape)-2)]
+    # collapse generated windows that are over the dim of the input - the ones we need to sum
+    axes = [len(dshape) + x for x in range(len(dshape) - 2)]
 
     return sum_reduce_converter(sw, axes, normalize)
 
