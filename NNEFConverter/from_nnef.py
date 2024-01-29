@@ -45,7 +45,7 @@ def dimension_picker(prefix, kernel_shape, suffix=''):
     E.g.call: dimension_picker(op_name)(attr)
 
     :param prefix: the name of the operator (e.g. conv)
-    :param kernel_shape: Shape of the tensor to fit the operation
+    :param kernel_shape: shape of the tensor to fit the operation
     :param suffix: optional suffix for ops
     :return: 'prefix`n`d' where n is the correct dimension for the kernel
     """
@@ -200,7 +200,7 @@ def _get_converter_map():
         # sliding-window
         'conv': conv_converter,
         'deconv': deconv_converter,
-        'box': ndop,
+        'box': box_converter,
         'debox': ndop,
         'argmax_pool': argmax_pool_converter,
         'sample': ndop,
@@ -228,8 +228,8 @@ def _get_converter_map():
         'stack': stack_covnerter,
         'unstack': ndop,
         'slice': slice_converter,
-        'pad': ndop,
-        'tile': ndop,
+        'pad': pad_converter,
+        'tile': tile_converter,
         # region-of-interest
         'avg_roi_pool': ndop,
         'max_roi_pool': ndop,
@@ -241,21 +241,21 @@ def _get_converter_map():
         # variables
         'update': ndop,
         # Compound
-        'sigmoid': ndop,  # activation
+        'sigmoid': sigmoid_converter,  # activation
         'relu': relu_converter,
-        'prelu': ndop,
-        'leaky_relu': ndop,
+        'prelu': prelu_converter,
+        'leaky_relu': leaky_relu_converter,
         'elu': ndop,
-        'tanh': ndop,
+        'tanh': tanh_converter,
         'softmax': softmax_converter,
         'softplus': ndop,
-        'linear': ndop,  # linear
+        'linear': linear_converter,  # linear
         'separable_conv': ndop,
         'separable_deconv': ndop,
         'max_pool_with_index': ndop,  # pooling
         'max_pool': max_pool_converter,
         'avg_pool': avg_pool_converter,
-        'rms_pool': ndop,
+        'rms_pool': rms_pool,
         'local_response_normalization': lrn_converter,  # normalization
         'local_mean_normalization': ndop,
         'local_variance_normalization': ndop,
@@ -710,6 +710,48 @@ def deconv_converter(data,
 
 # TODO box debox are what? can they be found in tvm? are they needed?
 
+# box/debox test, probably not efficient
+def box_converter(data,
+                  size,
+                  border,
+                  padding,
+                  stride,
+                  dilation,
+                  normalize,
+                  **kwargs):
+    if kwargs:
+        __unexpected_attrs('box', kwargs)
+
+    dshape = infer_shape(data)
+
+    # todo rewrite stride pad dil conv calculations, bc this shit is the third type
+
+    strides = stride if stride \
+        else (1,) * len(dshape)
+    # _stride_conv(stride, len(dshape)) if stride \
+    #     else (1,) * len(dshape)
+
+    dilation = dilation if dilation \
+        else (1,) * len(dshape)
+
+    if padding:
+        pad = padding
+        # _padding_conv(padding, len(dshape))
+        data = pad_converter(data, pad, border, _expr.const(0.0, 'float32'))
+    else:
+        # pad = (0,) * (len(dshape) - 2)
+        data = autopad(data,
+                       strides,
+                       dshape[2:],
+                       dilation)
+
+    leave_out_dims = len([x for x in size if x == 1])
+
+    sw = get_relay_op('sliding_window')(data, leave_out_dims, size[leave_out_dims:], strides[leave_out_dims:])
+    axes = [len(dshape)+ x for x in range(len(dshape)-2)]
+
+    return sum_reduce_converter(sw, axes, normalize)
+
 
 def argmax_pool_converter(data,
                           size,
@@ -964,7 +1006,7 @@ def slice_converter(data,
 
     # Needs manual stride overwrite because TVM slice breaks at multiple axes,
     # TODO?? check with TVM
-    stride = [1]*len(axes)
+    stride = [1] * len(axes)
 
     return get_relay_op('strided_slice')(data, begin, end, strides=stride, axes=axes)
 
@@ -1029,14 +1071,55 @@ def matmul_converter(a, b, transposeA, transposeB, **kwargs):
 
 def sigmoid_converter(data,
                       **kwargs):
+    if kwargs:
+        __unexpected_attrs('sigmoid', kwargs)
+
+    return get_relay_op('sigmoid')(data)
 
 
+def relu_converter(data,
+                   **kwargs):
+    if kwargs:
+        __unexpected_attrs('relu', kwargs)
 
-def relu_converter(data):
     return get_relay_op('relu')(data)
 
 
-def softmax_converter(data, axes):
+def prelu_converter(data,
+                    alpha,
+                    **kwargs):
+    if kwargs:
+        __unexpected_attrs('prelu', kwargs)
+
+    return get_relay_op('prelu')(data, alpha)
+
+
+def leaky_relu_converter(data,
+                         alpha,
+                         **kwargs):
+    if kwargs:
+        __unexpected_attrs('leaky_relu', kwargs)
+
+    return get_relay_op('leaky_relu')(data, alpha)
+
+
+# TODO elu
+
+
+def tanh_converter(data,
+                   **kwargs):
+    if kwargs:
+        __unexpected_attrs('tanh', kwargs)
+
+    return get_relay_op('tanh')(data)
+
+
+def softmax_converter(data,
+                      axes,
+                      **kwargs):
+    if kwargs:
+        __unexpected_attrs('softmax', kwargs)
+
     if len(axes) > 1:
         print('Multiple axes not supported, operation has been done along the first axis in axes.')
     axis = axes[0]
@@ -1044,12 +1127,36 @@ def softmax_converter(data, axes):
     return get_relay_op('softmax')(data, axis)
 
 
+# TODO softplus
+
+
+#   # linear ops
+
+def linear_converter(data,
+                     filter,
+                     bias,
+                     **kwargs):
+    if kwargs:
+        __unexpected_attrs('linear', kwargs)
+
+    out = get_relay_op('matmul')(data, filter, transpose_b=True)
+
+    return get_relay_op('add_bias')(out, bias)
+
+
+# TODO seaparable conv/deconv
+
+# TODO max_pool_with_index == argmax pool sol
+
 def max_pool_converter(data,
                        size,
                        border,
                        padding,
                        stride,
-                       dilation):
+                       dilation,
+                       **kwargs):
+    if kwargs:
+        __unexpected_attrs('max_pool', kwargs)
     # attr convs
     pool_size = _size_conv(size)
     strides = _stride_conv(stride, len(infer_shape(data)))
@@ -1073,12 +1180,17 @@ def avg_pool_converter(data,
                        border,
                        padding,
                        stride,
-                       dilation):
-    pool_size = _size_conv(size)
-    strides = _stride_conv(stride, len(infer_shape(data)))
-    pad = _padding_conv(padding, len(infer_shape(data)))
+                       dilation,
+                       **kwargs):
+    if kwargs:
+        __unexpected_attrs('avg_pool', kwargs)
 
-    op = get_relay_op(dimension_picker('avg_pool', infer_shape(data)))
+    dshape = infer_shape(data)
+    pool_size = _size_conv(size)
+    strides = _stride_conv(stride, len(dshape))
+    pad = _padding_conv(padding, len(dshape))
+
+    op = get_relay_op(dimension_picker('avg_pool', dshape))
     return op(data,
               pool_size=pool_size,
               strides=strides,
@@ -1091,6 +1203,28 @@ def avg_pool_converter(data,
               count_include_pad=False
               )
 
+
+def rms_pool(data,
+             size,
+             border,
+             padding,
+             stride,
+             dilation,
+             **kwargs):
+    if kwargs:
+        __unexpected_attrs('rms_pool', kwargs)
+
+    return sqrt_converter(
+        avg_pool_converter(
+            sqr_converter(data),
+            size=size,
+            border=border,
+            padding=padding,
+            stride=stride,
+            dilation=dilation))
+
+
+#   # Normalization
 
 def lrn_converter(data,
                   size,
@@ -1110,6 +1244,15 @@ def lrn_converter(data,
                                bias,
                                alpha,
                                beta)
+
+
+def local_mean_normalization_converter(data,
+                                       size,
+                                       **kwargs):
+    if kwargs:
+        __unexpected_attrs('local_mean_normalization', kwargs)
+
+    mean = get_relay_op('mean')(data)
 
 
 #   # Misc ops
