@@ -289,8 +289,11 @@ def _get_converter_map():
         'prelu': prelu_converter,
         'leaky_relu': leaky_relu_converter,
         'elu': elu_converter,
+        'selu': selu_converter,
+        'gelu': gelu_converter,
+        'silu': silu_converter,
         'softmax': softmax_converter,
-        'softplus': ndop,
+        'softplus': softplus_converter,
         'linear': linear_converter,  # linear
         'separable_conv': ndop,
         'separable_deconv': ndop,
@@ -299,12 +302,12 @@ def _get_converter_map():
         'avg_pool': avg_pool_converter,
         'rms_pool': rms_pool,
         'local_response_normalization': lrn_converter,  # normalization
-        'local_mean_normalization': ndop,
-        'local_variance_normalization': ndop,
-        'local_contrast_normalization': ndop,
-        'l1_normalization': ndop,
-        'l2_normalization': ndop,
-        'batch_normalization': ndop,
+        'local_mean_normalization': local_mean_normalization_converter(),
+        'local_variance_normalization': local_variance_normalization_converter(),
+        'local_contrast_normalization': local_contrast_normalization_converter(),
+        'l1_normalization': l1_normaliyation_converter(),
+        'l2_normalization': l2_normalization_converter(),
+        'batch_normalization': batch_normalization_converter(),
         'min_max_linear_quantize': ndop,  # quantization
         'zero_point_linear_quantize': ndop,
         'linear_quantize': ndop,
@@ -1011,7 +1014,7 @@ def sum_reduce_converter(data,
     out = get_relay_op('sum')(data, axes, keepdims=keepdims)
     if normalize:
         # TODO?? ask normalization value epsilon?
-        return get_relay_op('l2_normalize')(out, 0, [x - 2 for x in axes])
+        return l2_normalization_converter(out, 0, [x - 2 for x in axes], 0.0)
     return out
 
 
@@ -1305,6 +1308,40 @@ def elu_converter(data,
                             data)
 
 
+def selu_converter(data,
+                   alpha,
+                   lambda_var,
+                   **kwargs):
+    if kwargs:
+        __unexpected_attrs('selu', kwargs)
+
+    return mul_converter(_expr.const(lambda_var),
+                         select_converter(data < _expr.const(0.0),
+                                          mul_converter(_expr.const(alpha),
+                                                        sub_converter(exp_converter(data), _expr.const(1.0))),
+                                          data))
+
+
+def gelu_converter(data,
+                   **kwargs):
+    if kwargs:
+        __unexpected_attrs('gelu', kwargs)
+
+    # the exact definition of gelu is x * Phi(x) where Phi(x) is the
+    # CDF of the standard normal distribution, which can be approximated
+    # for example by sigmoid(1.702 * x)
+
+    return mul_converter(data, sigmoid_converter(mul_converter(_expr.const(1.702), data)))
+
+
+def silu_converter(data,
+                   **kwargs):
+    if kwargs:
+        __unexpected_attrs('silu', kwargs)
+
+    return mul_converter(data, sigmoid_converter(data))
+
+
 def softmax_converter(data,
                       axes,
                       **kwargs):
@@ -1318,7 +1355,12 @@ def softmax_converter(data,
     return get_relay_op('softmax')(data, axis)
 
 
-# TODO softplus
+def softplus_converter(data,
+                       **kwargs):
+    if kwargs:
+        __unexpected_attrs('softplus', kwargs)
+
+    return log_converter(add_converter(exp_converter(data), _expr.const(1.0)))
 
 
 #   # linear ops
@@ -1470,7 +1512,71 @@ def local_mean_normalization_converter(data,
     if kwargs:
         __unexpected_attrs('local_mean_normalization', kwargs)
 
-    mean = get_relay_op('mean')(data)
+    mean = box_converter(data, size, 'constant', [], [], [], normalize=True)
+    return sub_converter(data, mean)
+
+
+def local_variance_normalization_converter(data,
+                                           size,
+                                           bias,
+                                           epsilon,
+                                           **kwargs):
+    if kwargs:
+        __unexpected_attrs('local_variance_normalization', kwargs)
+
+    sigma = box_converter(sqr_converter(data), size, 'constant', [], [], [], normalize=True)
+    return div_converter(data,
+                         max_converter(add_converter(sqrt_converter(sigma), _expr.const(bias)),
+                                       epsilon))
+
+
+def local_contrast_normalization_converter(data,
+                                           size,
+                                           bias,
+                                           epsilon,
+                                           **kwargs):
+    if kwargs:
+        __unexpected_attrs('local_contrast_normalization', kwargs)
+
+    centered = local_mean_normalization_converter(data, size)
+    return local_variance_normalization_converter(centered, size, bias, epsilon)
+
+
+def l1_normaliyation_converter(data,
+                               axes,
+                               bias,
+                               epsilon,
+                               **kwargs):
+    if kwargs:
+        __unexpected_attrs('l1_normalization', kwargs)
+
+    sigma = sum_reduce_converter(abs_converter(data), axes, False)
+    return div_converter(data, max_converter(add_converter(sigma, _expr.const(bias)),
+                                             epsilon))
+
+
+def l2_normalization_converter(data,
+                               axes,
+                               bias,
+                               epsilon,
+                               **kwargs):
+    if kwargs:
+        __unexpected_attrs('l2_normalization', kwargs)
+
+    return get_relay_op('l2_normalize')(data, axes, bias, epsilon)
+
+
+def batch_normalization_converter(data,
+                                  mean,
+                                  variance,
+                                  offset,
+                                  scale,
+                                  epsilon,
+                                  **kwargs):
+    if kwargs:
+        __unexpected_attrs('batch_normalization', kwargs)
+
+    return get_relay_op('batch_norm')(data, scale, offset, mean, variance, epsilon=epsilon)
 
 
 #   # Misc ops
