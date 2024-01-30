@@ -244,12 +244,12 @@ def _get_converter_map():
         'conv': conv_converter,
         'deconv': deconv_converter,
         'box': box_converter,
-        'debox': ndop,
-        'argmax_pool': argmax_pool_converter,  # ----
-        'sample': ndop,
-        'desample': ndop,
-        'nearest_downsample': ndop,  # barmi pool csak arg mas
-        'area_downsample': ndop,  # avg pool kb box, de a stride dil no a factorral
+        'debox': debox_converter,  # todo? not impl
+        'argmax_pool': argmax_pool_converter,  # ----  not impl
+        'sample': sample_converter,  # todo? not impl
+        'desample': ndop,  # todo? not impl
+        'nearest_downsample': nearest_downsample_converter,
+        'area_downsample': area_downsample_converter,
         'nearest_upsample': nearest_upsample_converter,
         'multilinear_upsample': multilinear_upsample_converter,
         # reduce
@@ -268,8 +268,8 @@ def _get_converter_map():
         'transpose': transpose_converter,
         'split': split_converter,
         'concat': concat_converter,
-        'stack': stack_covnerter,
-        'unstack': ndop,
+        'stack': stack_converter,
+        'unstack': unstack_converter,
         'slice': slice_converter,
         'pad': pad_converter,
         'tile': tile_converter,
@@ -770,8 +770,6 @@ def deconv_converter(data,
     if kwargs:
         __unexpected_attrs('deconv', kwargs)
 
-    pass  # TODO can this be equal to conv transpose?
-
     if border != 'constant':
         print(f'Currently {border} border is not supported, used `constant` border')
 
@@ -830,9 +828,6 @@ def deconv_converter(data,
     return res
 
 
-# TODO box debox are what? can they be found in tvm? are they needed?
-
-# box/debox test, probably not efficient
 def box_converter(data,
                   size,
                   border,
@@ -852,6 +847,8 @@ def box_converter(data,
         if not normalize:
             out = mul_converter(out, _expr.const(math.prod(size), dtype='float32'))
         return out
+
+    # not efficient but works for any window size
 
     strides = stride if stride \
         else (1,) * len(dshape)
@@ -924,10 +921,41 @@ def sample_converter(data,
     if kwargs:
         __unexpected_attrs('sample', kwargs)
 
-    shape = infer_shape(data)
-    rank = len(shape)
-
     return ndop
+
+
+def nearest_downsample_converter(data,
+                                 factor,
+                                 **kwargs):
+    if kwargs:
+        __unexpected_attrs('nearest_downsample', kwargs)
+
+    dims = 2 + len(factor)
+
+    return box_converter(data,
+                         size=[1] * dims,
+                         border='constant',
+                         padding=[(0, 0)] * dims,
+                         stride=[1, 1] + factor,
+                         dilation=(1,) * dims,
+                         normalize=False)
+
+
+def area_downsample_converter(data,
+                              factor,
+                              **kwargs):
+    if kwargs:
+        __unexpected_attrs('area_downsample', kwargs)
+
+    dims = 2 + len(factor)
+
+    return box_converter(data,
+                         size=[1, 1] + factor,
+                         border='constant',
+                         padding=[(0, 0)] * dims,
+                         stride=[1, 1] + factor,
+                         dilation=(1,) * dims,
+                         normalize=True)
 
 
 def nearest_upsample_converter(data,
@@ -1077,14 +1105,16 @@ def reshape_converter(data,
     return get_relay_op('reshape')(data, newshape)
 
 
-def squeeze_converter(data, axes,
+def squeeze_converter(data,
+                      axes,
                       **kwargs):
     if kwargs:
         __unexpected_attrs('squeeze', kwargs)
     return relay.squeeze(data, axes)
 
 
-def unsqueeze_converter(data, axes,
+def unsqueeze_converter(data,
+                        axes,
                         **kwargs):
     if kwargs:
         __unexpected_attrs('unsqueeze', kwargs)
@@ -1121,7 +1151,7 @@ def split_converter(data,
     indices = []
     for r in ratio_list[:-1]:
         s += r
-        # Strinctly needs int ...
+        # Strictly needs int ...
         indices.append(int(s))
 
     return get_relay_op('split')(data, indices, axis)
@@ -1136,7 +1166,7 @@ def concat_converter(*data,
     return get_relay_op('concatenate')(data, axis)
 
 
-def stack_covnerter(*data,
+def stack_converter(*data,
                     axis,
                     **kwargs):
     if kwargs:
@@ -1146,6 +1176,18 @@ def stack_covnerter(*data,
 
 
 # TODO unstack
+def unstack_converter(data,
+                      axis,
+                      **kwargs):
+    if kwargs:
+        __unexpected_attrs('unstack', kwargs)
+
+    split = split_converter(data, axis, [1]).astuple()
+
+    res = []
+    for s in split:
+        res.append(squeeze_converter(s, axis))
+    return _expr.TupleWrapper(res, len(res))
 
 
 def slice_converter(data,
