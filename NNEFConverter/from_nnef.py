@@ -199,6 +199,16 @@ def _get_converter_map():
         'log': log_converter,
         'sin': sin_converter,
         'cos': cos_converter,
+        'tan': tan_converter,
+        'sinh': sinh_converter,
+        'cosh': cosh_converter,
+        'tanh': tanh_converter,
+        'asin': asin_converter,
+        'acos': acos_converter,
+        'atan': atan_converter,
+        'asinh': asinh_converter,
+        'acosh': acosh_converter,
+        'atanh': atanh_converter,
         'abs': abs_converter,
         'sign': sign_converter,
         'not': not_converter,  # logical
@@ -279,7 +289,6 @@ def _get_converter_map():
         'prelu': prelu_converter,
         'leaky_relu': leaky_relu_converter,
         'elu': ndop,
-        'tanh': tanh_converter,
         'softmax': softmax_converter,
         'softplus': ndop,
         'linear': linear_converter,  # linear
@@ -369,6 +378,86 @@ def cos_converter(data,
         __unexpected_attrs('cos', kwargs)
 
     return get_relay_op('cos')(data)
+
+
+def tan_converter(data,
+                  **kwargs):
+    if kwargs:
+        __unexpected_attrs('tan', kwargs)
+
+    return get_relay_op('tan')(data)
+
+
+def sinh_converter(data,
+                   **kwargs):
+    if kwargs:
+        __unexpected_attrs('sinh', kwargs)
+
+    return get_relay_op('sinh')(data)
+
+
+def cosh_converter(data,
+                   **kwargs):
+    if kwargs:
+        __unexpected_attrs('cosh', kwargs)
+
+    return get_relay_op('cosh')(data)
+
+
+def tanh_converter(data,
+                   **kwargs):
+    if kwargs:
+        __unexpected_attrs('tanh', kwargs)
+
+    return get_relay_op('tanh')(data)
+
+
+def asin_converter(data,
+                   **kwargs):
+    if kwargs:
+        __unexpected_attrs('asin', kwargs)
+
+    return get_relay_op('asin')(data)
+
+
+def acos_converter(data,
+                   **kwargs):
+    if kwargs:
+        __unexpected_attrs('acos', kwargs)
+
+    return get_relay_op('acos')(data)
+
+
+def atan_converter(data,
+                   **kwargs):
+    if kwargs:
+        __unexpected_attrs('atan', kwargs)
+
+    return get_relay_op('atan')(data)
+
+
+def asinh_converter(data,
+                    **kwargs):
+    if kwargs:
+        __unexpected_attrs('asinh', kwargs)
+
+    return get_relay_op('asinh')(data)
+
+
+def acosh_converter(data,
+                    **kwargs):
+    if kwargs:
+        __unexpected_attrs('acosh', kwargs)
+
+    return get_relay_op('acosh')(data)
+
+
+def atanh_converter(data,
+                    **kwargs):
+    if kwargs:
+        __unexpected_attrs('atanh', kwargs)
+
+    return get_relay_op('atanh')(data)
 
 
 def abs_converter(data,
@@ -542,7 +631,7 @@ def sqr_converter(data,
     if kwargs:
         __unexpected_attrs('sqr', kwargs)
 
-    return get_relay_op('power')(data, _expr.const(2.0))  # TODO! check
+    return get_relay_op('power')(data, _expr.const(2.0))
 
 
 def sqrt_converter(data,
@@ -558,7 +647,7 @@ def rsqr_converter(data,
     if kwargs:
         __unexpected_attrs('rsqr', kwargs)
 
-    return get_relay_op('power')(data, _expr.const(-2.0))  # TODO! check
+    return get_relay_op('power')(data, _expr.const(-2.0))
 
 
 def rsqrt_converter(data,
@@ -1169,14 +1258,6 @@ def leaky_relu_converter(data,
 # TODO elu
 
 
-def tanh_converter(data,
-                   **kwargs):
-    if kwargs:
-        __unexpected_attrs('tanh', kwargs)
-
-    return get_relay_op('tanh')(data)
-
-
 def softmax_converter(data,
                       axes,
                       **kwargs):
@@ -1235,7 +1316,7 @@ def max_pool_converter(data,
     if padding:
         pad = _padding_conv(padding, rank)
     else:
-        pad = (0,) * (rank - 2)     # TODO check if autopad is good here
+        pad = (0,) * (rank - 2)  # TODO check if autopad is good here
         data = autopad(data,
                        strides,
                        size[2:],
