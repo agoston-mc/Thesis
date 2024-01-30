@@ -1182,12 +1182,11 @@ def unstack_converter(data,
     if kwargs:
         __unexpected_attrs('unstack', kwargs)
 
-    split = split_converter(data, axis, [1]).astuple()
-
+    split = split_converter(data, axis, [1] * infer_shape(data)[axis])
     res = []
-    for s in split:
-        res.append(squeeze_converter(s, axis))
-    return _expr.TupleWrapper(res, len(res))
+    for i in range(len(split)):
+        res.append(squeeze_converter(split[i], axis))
+    return _expr.TupleWrapper(relay.Tuple(res), len(res))
 
 
 def slice_converter(data,
@@ -1234,6 +1233,7 @@ def tile_converter(data,
 #   # Region-of-interest ops
 
 # TODO roi pools ??
+def avg_roi_converter()
 
 
 #   # Matrix multiplication
