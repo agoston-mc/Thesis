@@ -1,3 +1,4 @@
+import math
 import os
 import itertools
 
@@ -62,11 +63,27 @@ def dimension_picker(prefix, kernel_shape, suffix=''):
     raise tvm.error.OpAttributeInvalid(msg)
 
 
-def _size_conv(size):
-    if len(size) == 4:
-        # if not isinstance(size[0], tuple):
-        assert size[0] == 1 and size[1] == 1, 'Incorrect window dimensions, first two dimensions must be 1'
-        return size[2], size[3]
+def _size_conv(size, rank):
+    # window of size (DH)W is only possible when it is checked outside, which is needed for alternative solution
+    if rank == 3:
+        if len(size) == 1:
+            return size
+        if len(size) == 3:
+            assert size[0] == 1 and size[1] == 1, 'Incorrect window dimensions, first two dimensions must be 1'
+            return size[2]
+    if rank == 4:
+        if len(size) == 2:
+            return size
+        if len(size) == 4:
+            assert size[0] == 1 and size[1] == 1, 'Incorrect window dimensions, first two dimensions must be 1'
+            return size[2:]
+    if rank == 5:
+        if len(size) == 3:
+            return size
+        if len(size) == 5:
+            assert size[0] == 1 and size[1] == 1, 'Incorrect window dimensions, first two dimensions must be 1'
+            return size[2:]
+
     else:
         raise ValueError(f'Unexpected window size, got {len(size)}')
 
@@ -79,6 +96,7 @@ def _stride_conv(stride, rank):
         # {pool style} :: [N, C, s] -> asrt N,C == 1; [s]
         if len(stride) == 3:
             assert stride[0] == 1 and stride[1] == 1, 'Not supported stride dimensions, first two dimensions must be 1'
+            return stride[2:]
     if rank == 4:
         # {conv style} :: [sh, sw] -> [sh, sw]
         if len(stride) == 2:
@@ -98,51 +116,66 @@ def _stride_conv(stride, rank):
     raise ValueError(f'Unexpected stride in {rank - 2}D, got {len(stride)}: {stride}')
 
 
-def _padding_conv(padding, rank):
+def _padding_conv(padding, rank, keepdims=False):
     if isinstance(padding[0], (tuple, list)):
         # 1D
         if rank == 3:
             # {conv style} :: [(l,r)] -> (l,r)
             if len(padding) == 1:
                 return padding[0]
-            # {pool style} :: [(batch),(channel),(l,r)] -> asrt N,C == 0, (l,r)
             if len(padding) == 3:
-                assert padding[0] == (0, 0) and padding[1] == (0, 0), ('Incorrect padding. '
-                                                                       'Padding on C,I dimensions not implemented')
-                return padding[2]
+                # {pool style} :: [(batch),(channel),(l,r)] -> asrt N,C == 0, (l,r)
+                if not keepdims:
+                    assert padding[0] == (0, 0) and padding[1] == (0, 0), ('Incorrect padding. '
+                                                                           'Padding on C,I dimensions not supported')
+                    return padding[2]
+                # {sliding window style} :: [(batch),(channel),(l,r)] -> [(batch),(channel),(l,r)]
+                else:
+                    return padding
 
-        # 2D
+                    # 2D
+
         if rank == 4:
             # {conv style} :: [(u,d),(l,r)] -> (u, l, d, r)
             if len(padding) == 2:
                 # change UDLR to ULDR padding, LC is faster here
                 return [x[i] for i in [0, 1] for x in padding]
 
-            # {pool style} :: [(batch size),(channel),(u,p),(l,r)] -> asrt N,C == 0, (u, l, d, r)
             if len(padding) == 4:
-                assert padding[0] == (0, 0) and padding[1] == (0, 0), ('Incorrect padding. '
-                                                                       'Padding on C,I dimensions not implemented')
-                # itertools is faster than LC bc of splicing
-                return list(itertools.chain.from_iterable(zip(padding[2], padding[3])))
+                # {pool style} :: [(batch size),(channel),(u,d),(l,r)] -> asrt N,C == 0, (u, l, d, r)
+                if not keepdims:
+                    assert padding[0] == (0, 0) and padding[1] == (0, 0), ('Incorrect padding. '
+                                                                           'Padding on C,I dimensions not supported')
+                    # itertools is faster than LC (slicing)
+                    return list(itertools.chain.from_iterable(zip(padding[2], padding[3])))
+                # {sliding window style} :: [(batch),(channel),(u,d),(l,r)] -> [(batch),(channel),(u,d),(l,r)]
+                else:
+                    return padding
 
-        # 3D
+                    # 3D
+
         if rank == 5:
             # {conv style} :: [(f,b),(u,d),(l,r)] -> (f, u, l, b, d, r)
             if len(padding) == 3:
                 # LC is faster
                 return [x[i] for i in [0, 1] for x in padding]
 
-            # {pool style} :: [(batch size),(channel),(f,b)(u,p),(l,r)] -> asrt N,C == 0, (f, u, l, b, d, r)
             if len(padding) == 5:
-                assert padding[0] == (0, 0) and padding[1] == (0, 0), ('Incorrect padding. '
-                                                                       'Padding on C,I dimensions not implemented')
-                # itertools faster barely
-                return list(itertools.chain.from_iterable(zip(padding[2], padding[3], padding[4])))
+                # {pool style} :: [(batch size),(channel),(f,b)(u,p),(l,r)] -> asrt N,C == 0, (f, u, l, b, d, r)
+                if not keepdims:
+                    assert padding[0] == (0, 0) and padding[1] == (0, 0), ('Incorrect padding. '
+                                                                           'Padding on C,I dimensions not supported')
+                    # itertools faster barely
+                    return list(itertools.chain.from_iterable(zip(padding[2], padding[3], padding[4])))
+                # {sliding window style} :: [(batch),(channel),(f,b),(u,d),(l,r)] -> [(batch),(channel),(f,b),(u,d),(l,r)]
+                else:
+                    return padding
 
         raise ValueError(f'Incorrect padding style for {rank - 2}D operand. Only length of {rank - 2}, {rank} '
-                         f'implemented, got{len(padding)}: {padding}')
+                         f'supported, got {len(padding)}: {padding}')
 
-    return padding
+    raise ValueError('nnef should not have singular padding')
+    # return padding
 
 
 def make_parameter_span(source_name_list, name_sep="."):
@@ -202,11 +235,11 @@ def _get_converter_map():
         'deconv': deconv_converter,
         'box': box_converter,
         'debox': ndop,
-        'argmax_pool': argmax_pool_converter,
+        'argmax_pool': argmax_pool_converter,  # ----
         'sample': ndop,
         'desample': ndop,
-        'nearest_downsample': ndop,
-        'area_downsample': ndop,
+        'nearest_downsample': ndop,  # barmi pool csak arg mas
+        'area_downsample': ndop,  # avg pool kb box, de a stride dil no a factorral
         'nearest_upsample': nearest_upsample_converter,
         'multilinear_upsample': multilinear_upsample_converter,
         # reduce
@@ -239,7 +272,7 @@ def _get_converter_map():
         # matrix multiplication
         'matmul': matmul_converter,
         # variables
-        'update': ndop,
+        'update': ndop,  # ---
         # Compound
         'sigmoid': sigmoid_converter,  # activation
         'relu': relu_converter,
@@ -724,19 +757,22 @@ def box_converter(data,
 
     dshape = infer_shape(data)
 
-    # todo rewrite stride pad dil conv calculations, bc this shit is the third type
+    # check if window size is 1 on N, C, avg pool only supports window on D H W
+    if size[:2] == [1, 1]:
+        out = avg_pool_converter(data, size[2:], border, padding, stride, dilation)
+        if not normalize:
+            out = mul_converter(out, _expr.const(math.prod(size), dtype='float32'))
+        return out
 
     strides = stride if stride \
         else (1,) * len(dshape)
-    # _stride_conv(stride, len(dshape)) if stride \
-    #     else (1,) * len(dshape)
 
     dilation = dilation if dilation \
         else (1,) * len(dshape)
 
     if padding:
         pad = padding
-        # _padding_conv(padding, len(dshape))
+        _padding_conv(padding, len(dshape))
         data = pad_converter(data, pad, border, _expr.const(0.0, 'float32'))
     else:
         # pad = (0,) * (len(dshape) - 2)
@@ -752,7 +788,26 @@ def box_converter(data,
     # collapse generated windows that are over the dim of the input - the ones we need to sum
     axes = [len(dshape) + x for x in range(len(dshape) - 2)]
 
-    return sum_reduce_converter(sw, axes, normalize)
+    # L2 normalize in sum_reduce is not good, so define own
+    out = sum_reduce_converter(sw, axes, False, keepdims=False)
+    if normalize:
+        rhs = _expr.const(np.full([infer_shape(out)], math.prod(size), dtype='float32'))
+        out = get_relay_op('divide')(out, rhs)
+    return out
+
+
+def debox_converter(data,
+                    size,
+                    border,
+                    padding,
+                    stride,
+                    dilation,
+                    normalize,
+                    **kwargs):
+    if kwargs:
+        __unexpected_attrs('debox', kwargs)
+
+    return ndop
 
 
 def argmax_pool_converter(data,
@@ -767,7 +822,6 @@ def argmax_pool_converter(data,
 
     raise NotImplementedError('argmax_pool not implemented')
     # TODO maybe do it with slicing?
-    # return relay.argmax(data, size[2:])
 
 
 def sample_converter(data,
@@ -832,12 +886,12 @@ def multilinear_upsample_converter(data,
 def sum_reduce_converter(data,
                          axes,
                          normalize,
+                         keepdims=True,
                          **kwargs):
     if kwargs:
         __unexpected_attrs('sum_reduce', kwargs)
 
-    out = get_relay_op('sum')(data, axes)
-
+    out = get_relay_op('sum')(data, axes, keepdims=keepdims)
     if normalize:
         # TODO?? ask normalization value epsilon?
         return get_relay_op('l2_normalize')(out, 0, [x - 2 for x in axes])
@@ -846,65 +900,72 @@ def sum_reduce_converter(data,
 
 def max_reduce_converter(data,
                          axes,
+                         keepdims=True,
                          **kwargs):
     if kwargs:
         __unexpected_attrs('max_reduce', kwargs)
 
-    return get_relay_op('max')(data, axes)
+    return get_relay_op('max')(data, axes, keepdims=keepdims)
 
 
 def min_reduce_converter(data,
                          axes,
+                         keepdims=True,
                          **kwargs):
     if kwargs:
         __unexpected_attrs('min_reduce', kwargs)
 
-    return get_relay_op('min')(data, axes)
+    return get_relay_op('min')(data, axes, keepdims=keepdims)
 
 
 def argmax_reduce_converter(data,
                             axes,
+                            keepdims=True,
                             **kwargs):
     if kwargs:
         __unexpected_attrs('argmax_reduce', kwargs)
 
-    return get_relay_op('argmax')(data, axes)
+    return get_relay_op('argmax')(data, axes, keepdims=keepdims)
 
 
 def argmin_reduce_converter(data,
                             axes,
+                            keepdims=True,
                             **kwargs):
     if kwargs:
         __unexpected_attrs('argmin_reduce', kwargs)
 
-    return get_relay_op('argmin')(data, axes)
+    return get_relay_op('argmin')(data, axes, keepdims=keepdims)
 
 
 def all_reduce_converter(data,
                          axes,
+                         keepdims=True,
                          **kwargs):
     if kwargs:
         __unexpected_attrs('all_reduce', kwargs)
 
-    return get_relay_op('all')(data, axes)
+    return get_relay_op('all')(data, axes, keepdims=keepdims)
 
 
 def any_reduce_converter(data,
                          axes,
+                         keepdims=True,
                          **kwargs):
     if kwargs:
         __unexpected_attrs('any_reduce', kwargs)
 
-    return get_relay_op('any')(data, axes)
+    return get_relay_op('any')(data, axes, keepdims=keepdims)
 
 
 def mean_reduce_converter(data,
                           axes,
+                          keepdims=True,
                           **kwargs):
     if kwargs:
         __unexpected_attrs('mean_reduce', kwargs)
 
-    return get_relay_op('mean')(data, axes)
+    return get_relay_op('mean')(data, axes, keepdims=keepdims)
 
 
 #   # Tensor shape ops
@@ -977,7 +1038,7 @@ def split_converter(data,
     return get_relay_op('split')(data, indices, axis)
 
 
-def concat_converter(data,
+def concat_converter(*data,
                      axis,
                      **kwargs):
     if kwargs:
@@ -986,7 +1047,7 @@ def concat_converter(data,
     return get_relay_op('concatenate')(data, axis)
 
 
-def stack_covnerter(data,
+def stack_covnerter(*data,
                     axis,
                     **kwargs):
     if kwargs:
@@ -1146,9 +1207,9 @@ def linear_converter(data,
     return get_relay_op('add_bias')(out, bias)
 
 
-# TODO seaparable conv/deconv
+# TODO separable conv/deconv
 
-# TODO max_pool_with_index == argmax pool sol
+# TODO--- max_pool_with_index == argmax pool sol
 
 def max_pool_converter(data,
                        size,
@@ -1159,10 +1220,28 @@ def max_pool_converter(data,
                        **kwargs):
     if kwargs:
         __unexpected_attrs('max_pool', kwargs)
-    # attr convs
-    pool_size = _size_conv(size)
-    strides = _stride_conv(stride, len(infer_shape(data)))
-    pad = _padding_conv(padding, len(infer_shape(data)))
+
+    if border != 'constant':
+        print(f'Currently {border} border is not supported, used `constant` border')
+
+    rank = len(infer_shape(data))
+    pool_size = _size_conv(size, rank)
+    strides = _stride_conv(stride, rank) if stride \
+        else (1,) * (rank - 2)
+
+    dilation = dilation if dilation else (
+            (1,) * (rank - 2))
+
+    if padding:
+        pad = _padding_conv(padding, rank)
+    else:
+        pad = (0,) * (rank - 2)     # TODO check if autopad is good here
+        data = autopad(data,
+                       strides,
+                       size[2:],
+                       dilation,
+                       # mode ?? == SAME UPPER currently seems fine
+                       )
 
     op = get_relay_op(dimension_picker('max_pool', infer_shape(data)))
     return op(data,
@@ -1170,10 +1249,6 @@ def max_pool_converter(data,
               strides=strides,
               dilation=dilation,
               padding=pad,
-              # #defs
-              layout="NCHW",
-              out_layout="",
-              ceil_mode=False
               )
 
 
@@ -1187,22 +1262,35 @@ def avg_pool_converter(data,
     if kwargs:
         __unexpected_attrs('avg_pool', kwargs)
 
-    dshape = infer_shape(data)
-    pool_size = _size_conv(size)
-    strides = _stride_conv(stride, len(dshape))
-    pad = _padding_conv(padding, len(dshape))
+    if border != 'constant':
+        print(f'Currently {border} border is not supported, used `constant` border')
 
-    op = get_relay_op(dimension_picker('avg_pool', dshape))
+    rank = len(infer_shape(data))
+    pool_size = _size_conv(size, rank)
+    strides = _stride_conv(stride, rank) if stride \
+        else (1,) * (rank - 2)
+
+    dilation = dilation if dilation else (
+            (1,) * (rank - 2))
+
+    if padding:
+        pad = _padding_conv(padding, rank)
+    else:
+        pad = (0,) * (rank - 2)  # TODO check if autopad is good here
+        data = autopad(data,
+                       strides,
+                       size[2:],
+                       dilation,
+                       # mode ?? == SAME UPPER currently seems fine
+                       )
+
+    op = get_relay_op(dimension_picker('avg_pool', infer_shape(data)))
     return op(data,
               pool_size=pool_size,
               strides=strides,
               dilation=dilation,
               padding=pad,
-              # #defs
-              layout="NCHW",
-              out_layout="",
-              ceil_mode=False,
-              count_include_pad=False
+              count_include_pad=True
               )
 
 
