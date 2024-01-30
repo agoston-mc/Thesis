@@ -288,7 +288,7 @@ def _get_converter_map():
         'relu': relu_converter,
         'prelu': prelu_converter,
         'leaky_relu': leaky_relu_converter,
-        'elu': ndop,
+        'elu': elu_converter,
         'softmax': softmax_converter,
         'softplus': ndop,
         'linear': linear_converter,  # linear
@@ -1232,15 +1232,11 @@ def tile_converter(data,
 
 #   # Region-of-interest ops
 
-# TODO roi pools ??
-def avg_roi_converter()
+# TODO- roi pools ??
 
 
 #   # Matrix multiplication
 def matmul_converter(a, b, transposeA, transposeB, **kwargs):
-    """
-    Matmul using `dense` for 2D and `batch_matmul` for higher
-    """
     if kwargs:
         __unexpected_attrs('matmul', kwargs)
 
@@ -1297,7 +1293,16 @@ def leaky_relu_converter(data,
     return get_relay_op('leaky_relu')(data, alpha)
 
 
-# TODO elu
+def elu_converter(data,
+                  alpha,
+                  **kwargs):
+    if kwargs:
+        __unexpected_attrs('elu', kwargs)
+
+    return select_converter(lt_converter(data, _expr.const(0.0)),
+                            mul_converter(_expr.const(alpha),
+                                          sub_converter(exp_converter(data), _expr.const(1.0))),
+                            data)
 
 
 def softmax_converter(data,
