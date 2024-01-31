@@ -6,7 +6,7 @@ Using the python API of tvm
 
 ## Usage
 
-```
+```{python}
 from NNEFConverter import from_nnef 
 model, params = from_nnef('path_to_nnef_dir')
 ``` 

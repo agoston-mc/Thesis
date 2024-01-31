@@ -1469,7 +1469,7 @@ def avg_pool_converter(data,
     if kwargs:
         __unexpected_attrs('avg_pool', kwargs)
 
-    if border != 'constant':
+    if border != 'constant' or border != 'ignore':
         print(f'Currently {border} border is not supported, used `constant` border')
 
     rank = len(infer_shape(data))
@@ -1497,7 +1497,7 @@ def avg_pool_converter(data,
               strides=strides,
               dilation=dilation,
               padding=pad,
-              count_include_pad=True
+              count_include_pad=border != 'ignore'
               )
 
 
@@ -1523,11 +1523,11 @@ def rms_pool(data,
 
 #   # Normalization
 
-def lrn_converter(data,
-                  size,
-                  alpha,
-                  beta,
-                  bias):
+def local_response_normalization_converter(data,
+                                           size,
+                                           alpha,
+                                           beta,
+                                           bias):
     axis = [i for i in range(len(size)) if size[i] > 1]
     if len(axis) == 1:
         axis = axis[0]
