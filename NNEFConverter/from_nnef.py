@@ -244,10 +244,10 @@ def _get_converter_map():
         'conv': conv_converter,
         'deconv': deconv_converter,
         'box': box_converter,
-        'debox': debox_converter,  # todo? not impl
+        'debox': debox_converter,  # td? not impl
         'argmax_pool': argmax_pool_converter,  # ----  not impl
-        'sample': sample_converter,  # todo? not impl
-        'desample': ndop,  # todo? not impl
+        'sample': sample_converter,  # td? not impl
+        'desample': ndop,  # td? not impl
         'nearest_downsample': nearest_downsample_converter,
         'area_downsample': area_downsample_converter,
         'nearest_upsample': nearest_upsample_converter,
@@ -273,7 +273,7 @@ def _get_converter_map():
         'slice': slice_converter,
         'pad': pad_converter,
         'tile': tile_converter,
-        # region-of-interest
+        # region-of-interest - not needed - not supported
         'avg_roi_pool': ndop,
         'max_roi_pool': ndop,
         'roi_resample': ndop,
@@ -282,7 +282,7 @@ def _get_converter_map():
         # matrix multiplication
         'matmul': matmul_converter,
         # variables
-        'update': ndop,  # ---
+        'update': ndop,  # --- not used
         # Compound
         'sigmoid': sigmoid_converter,  # activation
         'relu': relu_converter,
@@ -760,6 +760,7 @@ def conv_converter(data,
     return res
 
 
+# TODO test this, output shape might be wrong?
 def deconv_converter(data,
                      kernel,
                      bias,
@@ -1378,6 +1379,42 @@ def linear_converter(data,
 
 
 # TODO separable conv/deconv
+
+def separable_conv_converter(data,
+                             plane_filter,
+                             point_filter,
+                             bias,
+                             border,
+                             padding,
+                             stride,
+                             dilation,
+                             groups,
+                             **kwargs):
+    if kwargs:
+        __unexpected_attrs('separable_conv', kwargs)
+
+    filtered = conv_converter(data, plane_filter, [], border, stride, padding, dilation, groups)
+
+    return conv_converter(filtered, point_filter, bias, [], [], [], [], groups)
+
+
+def separable_deconv_converter(data,
+                               plane_filter,
+                               point_filter,
+                               bias,
+                               border,
+                               padding,
+                               stride,
+                               dilation,
+                               groups,
+                               **kwargs):
+    if kwargs:
+        __unexpected_attrs('separable_deconv', kwargs)
+
+    filtered = deconv_converter(data, plane_filter, [], border, stride, padding, dilation, [], groups)
+
+    return deconv_converter(filtered, point_filter, bias, [], [], [], [], [], groups)
+
 
 # TODO--- max_pool_with_index == argmax pool sol
 
