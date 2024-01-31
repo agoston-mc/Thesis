@@ -302,12 +302,12 @@ def _get_converter_map():
         'avg_pool': avg_pool_converter,
         'rms_pool': rms_pool,
         'local_response_normalization': lrn_converter,  # normalization
-        'local_mean_normalization': local_mean_normalization_converter(),
-        'local_variance_normalization': local_variance_normalization_converter(),
-        'local_contrast_normalization': local_contrast_normalization_converter(),
-        'l1_normalization': l1_normaliyation_converter(),
-        'l2_normalization': l2_normalization_converter(),
-        'batch_normalization': batch_normalization_converter(),
+        'local_mean_normalization': local_mean_normalization_converter,
+        'local_variance_normalization': local_variance_normalization_converter,
+        'local_contrast_normalization': local_contrast_normalization_converter,
+        'l1_normalization': l1_normaliyation_converter,
+        'l2_normalization': l2_normalization_converter,
+        'batch_normalization': batch_normalization_converter,
         'min_max_linear_quantize': ndop,  # quantization
         'zero_point_linear_quantize': ndop,
         'linear_quantize': ndop,
