@@ -301,7 +301,7 @@ def _get_converter_map():
         'max_pool': max_pool_converter,
         'avg_pool': avg_pool_converter,
         'rms_pool': rms_pool,
-        'local_response_normalization': lrn_converter,  # normalization
+        'local_response_normalization': local_response_normalization_converter,  # normalization
         'local_mean_normalization': local_mean_normalization_converter,
         'local_variance_normalization': local_variance_normalization_converter,
         'local_contrast_normalization': local_contrast_normalization_converter,
