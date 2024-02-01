@@ -1613,7 +1613,12 @@ def batch_normalization_converter(data,
     if kwargs:
         __unexpected_attrs('batch_normalization', kwargs)
 
-    return get_relay_op('batch_norm')(data, scale, offset, mean, variance, epsilon=epsilon)
+    mean = squeeze_converter(mean, 0)
+    variance = squeeze_converter(variance, 0)
+    offset = squeeze_converter(offset, 0)
+    scale = squeeze_converter(scale, 0)
+
+    return get_relay_op('batch_norm')(data, scale, offset, mean, variance, epsilon=epsilon)[0]
 
 
 #   # Misc ops
