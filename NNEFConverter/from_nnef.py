@@ -731,6 +731,9 @@ def conv_converter(data,
 
     channels = kernel_shape[0]
 
+    if groups == 0:
+        groups = channels
+
     op = get_relay_op(dimension_picker('conv', kernel_shape))
     conv_out = op(
         data=data,
