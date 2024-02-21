@@ -717,17 +717,21 @@ def conv_converter(data,
     dilation = dilation if dilation else (
             (1,) * (len(kernel_shape) - 2))
 
-    if padding:
-        pad = _padding_conv(padding, len(kernel_shape))
-    else:
-        pad = (0,) * (len(kernel_shape) - 2)
-        data = autopad(data,
-                       strides,
-                       kernel_shape[2:],
-                       dilation,
-                       # mode ?? == SAME UPPER currently seems fine
-                       )
-        # autopad seems equal to nnef autopadding equation
+    if not padding:
+        output = [(ui + (s - 1)) // s for ui, s in zip(data, stride)]
+        dilated = [(f - 1) * d + 1 for f, d in zip(kernel, dilation)]
+        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, stride, dilated, data)]
+        padding = [(pad // 2, (pad + 1) // 2) for pad in total]
+
+    pad = _padding_conv(padding, len(kernel_shape))
+        # pad = (0,) * (len(kernel_shape) - 2)
+        # data = autopad(data,
+        #                strides,
+        #                kernel_shape[2:],
+        #                dilation,
+        #                # mode ?? == SAME UPPER currently seems fine
+        #                )
+        # # autopad seems equal to nnef autopadding equation
 
     channels = kernel_shape[0]
 
@@ -863,16 +867,13 @@ def box_converter(data,
     dilation = dilation if dilation \
         else (1,) * len(dshape)
 
-    if padding:
-        pad = padding
-        _padding_conv(padding, len(dshape))
-        data = pad_converter(data, pad, border, _expr.const(0.0, 'float32'))
-    else:
-        # pad = (0,) * (len(dshape) - 2)
-        data = autopad(data,
-                       strides,
-                       dshape[2:],
-                       dilation)
+    if not padding:
+        output = [(ui + (s - 1)) // s for ui, s in zip(data, stride)]
+        dilated = [(f - 1) * d + 1 for f, d in zip(size, dilation)]
+        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, stride, dilated, data)]
+        padding = [(pad // 2, (pad + 1) // 2) for pad in total]
+
+    data = pad_converter(data, padding, border, _expr.const(0.0, 'float32'))
 
     leave_out_dims = len([x for x in size if x == 1])
 
@@ -1434,7 +1435,9 @@ def max_pool_converter(data,
     if border != 'constant':
         print(f'Currently {border} border is not supported, used `constant` border')
 
-    rank = len(infer_shape(data))
+    dshape = infer_shape(data)
+    rank = len(dshape)
+
     pool_size = _size_conv(size, rank)
     strides = _stride_conv(stride, rank) if stride \
         else (1,) * (rank - 2)
@@ -1442,16 +1445,13 @@ def max_pool_converter(data,
     dilation = dilation if dilation else (
             (1,) * (rank - 2))
 
-    if padding:
-        pad = _padding_conv(padding, rank)
-    else:
-        pad = (0,) * (rank - 2)  # TODO check if autopad is good here
-        data = autopad(data,
-                       strides,
-                       size[2:],
-                       dilation,
-                       # mode ?? == SAME UPPER currently seems fine
-                       )
+    if not padding:
+        output = [(ui + (s - 1)) // s for ui, s in zip(data, stride)]
+        dilated = [(f - 1) * d + 1 for f, d in zip(size, dilation)]
+        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, stride, dilated, data)]
+        padding = [(pad // 2, (pad + 1) // 2) for pad in total]
+
+    pad = _padding_conv(padding, rank)
 
     op = get_relay_op(dimension_picker('max_pool', infer_shape(data)))
     return op(data,
@@ -1472,10 +1472,11 @@ def avg_pool_converter(data,
     if kwargs:
         __unexpected_attrs('avg_pool', kwargs)
 
-    if border != 'constant' or border != 'ignore':
+    if border not in ['constant', 'ignore']:
         print(f'Currently {border} border is not supported, used `constant` border')
 
-    rank = len(infer_shape(data))
+    dshape = infer_shape(data)
+    rank = len(dshape)
     pool_size = _size_conv(size, rank)
     strides = _stride_conv(stride, rank) if stride \
         else (1,) * (rank - 2)
@@ -1483,16 +1484,13 @@ def avg_pool_converter(data,
     dilation = dilation if dilation else (
             (1,) * (rank - 2))
 
-    if padding:
-        pad = _padding_conv(padding, rank)
-    else:
-        pad = (0,) * (rank - 2)  # TODO check if autopad is good here
-        data = autopad(data,
-                       strides,
-                       size[2:],
-                       dilation,
-                       # mode ?? == SAME UPPER currently seems fine
-                       )
+    if not padding:
+        output = [(ui + (s - 1)) // s for ui, s in zip(data, stride)]
+        dilated = [(f - 1) * d + 1 for f, d in zip(size, dilation)]
+        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, stride, dilated, data)]
+        padding = [(pad // 2, (pad + 1) // 2) for pad in total]
+
+    pad = _padding_conv(padding, rank)
 
     op = get_relay_op(dimension_picker('avg_pool', infer_shape(data)))
     return op(data,
