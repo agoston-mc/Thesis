@@ -710,6 +710,7 @@ def conv_converter(data,
         print(f'Currently {border} border is not supported, used `constant` border')
 
     kernel_shape = infer_shape(kernel)
+    dshape = infer_shape(data)
 
     strides = _stride_conv(stride, len(kernel_shape)) if stride \
         else (1,) * (len(kernel_shape) - 2)
@@ -717,21 +718,22 @@ def conv_converter(data,
     dilation = dilation if dilation else (
             (1,) * (len(kernel_shape) - 2))
 
+    # TODO check
     if not padding:
-        output = [(ui + (s - 1)) // s for ui, s in zip(data, stride)]
+        output = [(ui + (s - 1)) // s for ui, s in zip(dshape, stride)]
         dilated = [(f - 1) * d + 1 for f, d in zip(kernel, dilation)]
-        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, stride, dilated, data)]
+        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, stride, dilated, dshape)]
         padding = [(pad // 2, (pad + 1) // 2) for pad in total]
 
     pad = _padding_conv(padding, len(kernel_shape))
-        # pad = (0,) * (len(kernel_shape) - 2)
-        # data = autopad(data,
-        #                strides,
-        #                kernel_shape[2:],
-        #                dilation,
-        #                # mode ?? == SAME UPPER currently seems fine
-        #                )
-        # # autopad seems equal to nnef autopadding equation
+    # pad = (0,) * (len(kernel_shape) - 2)
+    # data = autopad(data,
+    #                strides,
+    #                kernel_shape[2:],
+    #                dilation,
+    #                # mode ?? == SAME UPPER currently seems fine
+    #                )
+    # # autopad seems equal to nnef autopadding equation
 
     channels = kernel_shape[0]
 
@@ -867,10 +869,12 @@ def box_converter(data,
     dilation = dilation if dilation \
         else (1,) * len(dshape)
 
+    # padding is truncated to `conv style` (only active layers are present)
+    active_shape = dshape[2:]
     if not padding:
-        output = [(ui + (s - 1)) // s for ui, s in zip(data, stride)]
-        dilated = [(f - 1) * d + 1 for f, d in zip(size, dilation)]
-        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, stride, dilated, data)]
+        output = [(ui + (s - 1)) // s for ui, s in zip(active_shape, strides)]
+        dilated = [(f - 1) * d + 1 for f, d in zip(pool_size, dilation)]
+        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, strides, dilated, active_shape)]
         padding = [(pad // 2, (pad + 1) // 2) for pad in total]
 
     data = pad_converter(data, padding, border, _expr.const(0.0, 'float32'))
@@ -1445,15 +1449,17 @@ def max_pool_converter(data,
     dilation = dilation if dilation else (
             (1,) * (rank - 2))
 
+    # padding is truncated to `conv style` (only active layers are present)
+    active_shape = dshape[2:]
     if not padding:
-        output = [(ui + (s - 1)) // s for ui, s in zip(data, stride)]
-        dilated = [(f - 1) * d + 1 for f, d in zip(size, dilation)]
-        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, stride, dilated, data)]
+        output = [(ui + (s - 1)) // s for ui, s in zip(active_shape, strides)]
+        dilated = [(f - 1) * d + 1 for f, d in zip(pool_size, dilation)]
+        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, strides, dilated, active_shape)]
         padding = [(pad // 2, (pad + 1) // 2) for pad in total]
 
     pad = _padding_conv(padding, rank)
 
-    op = get_relay_op(dimension_picker('max_pool', infer_shape(data)))
+    op = get_relay_op(dimension_picker('max_pool', dshape))
     return op(data,
               pool_size=pool_size,
               strides=strides,
@@ -1484,15 +1490,17 @@ def avg_pool_converter(data,
     dilation = dilation if dilation else (
             (1,) * (rank - 2))
 
+    # padding is truncated to `conv style` (only active layers are present)
+    active_shape = dshape[2:]
     if not padding:
-        output = [(ui + (s - 1)) // s for ui, s in zip(data, stride)]
-        dilated = [(f - 1) * d + 1 for f, d in zip(size, dilation)]
-        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, stride, dilated, data)]
+        output = [(ui + (s - 1)) // s for ui, s in zip(active_shape, strides)]
+        dilated = [(f - 1) * d + 1 for f, d in zip(pool_size, dilation)]
+        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, strides, dilated, active_shape)]
         padding = [(pad // 2, (pad + 1) // 2) for pad in total]
 
     pad = _padding_conv(padding, rank)
 
-    op = get_relay_op(dimension_picker('avg_pool', infer_shape(data)))
+    op = get_relay_op(dimension_picker('avg_pool', dshape))
     return op(data,
               pool_size=pool_size,
               strides=strides,
