@@ -718,22 +718,22 @@ def conv_converter(data,
     dilation = dilation if dilation else (
             (1,) * (len(kernel_shape) - 2))
 
-    # TODO check
+    active_shape = dshape[2:]
     if not padding:
-        output = [(ui + (s - 1)) // s for ui, s in zip(dshape, stride)]
-        dilated = [(f - 1) * d + 1 for f, d in zip(kernel, dilation)]
-        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, stride, dilated, dshape)]
+        output = [(ui + (s - 1)) // s for ui, s in zip(active_shape, strides)]
+        dilated = [(f - 1) * d + 1 for f, d in zip(kernel_shape[2:], dilation)]
+        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, strides, dilated, active_shape)]
         padding = [(pad // 2, (pad + 1) // 2) for pad in total]
 
     pad = _padding_conv(padding, len(kernel_shape))
-    # pad = (0,) * (len(kernel_shape) - 2)
-    # data = autopad(data,
-    #                strides,
-    #                kernel_shape[2:],
-    #                dilation,
-    #                # mode ?? == SAME UPPER currently seems fine
-    #                )
-    # # autopad seems equal to nnef autopadding equation
+        # pad = (0,) * (len(kernel_shape) - 2)
+        # data = autopad(data,
+        #                strides,
+        #                kernel_shape[2:],
+        #                dilation,
+        #                # mode ?? == SAME UPPER currently seems fine
+        #                )
+        # # autopad seems equal to nnef autopadding equation
 
     channels = kernel_shape[0]
 
