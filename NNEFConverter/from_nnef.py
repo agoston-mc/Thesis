@@ -348,8 +348,7 @@ def rcp_converter(data,
     if kwargs:
         __unexpected_attrs('rcp', kwargs)
 
-    raise NotImplementedError('There is no equivalent tp rcp in Relay, TODO in cpp side maybe? ')
-
+    return div_converter(_expr.const(1), data)
 
 def exp_converter(data,
                   **kwargs):
@@ -712,6 +711,7 @@ def conv_converter(data,
     kernel_shape = infer_shape(kernel)
     dshape = infer_shape(data)
 
+
     strides = _stride_conv(stride, len(kernel_shape)) if stride \
         else (1,) * (len(kernel_shape) - 2)
 
@@ -759,7 +759,7 @@ def conv_converter(data,
 
     res = None
     if isinstance(bias, _expr.Constant):
-        if bias.data.numpy() == np.array([0.0]):
+        if (bias.data.numpy() == 0).all():
             res = conv_out
 
     if not res:
