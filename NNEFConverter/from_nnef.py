@@ -40,6 +40,18 @@ def get_type(elem_type):
     raise TypeError(f'Type \'{elem_type}\' is not implemented')
 
 
+def infer_type(val):
+    if isinstance(val, bool):
+        return 'bool'
+    if isinstance(val, float):
+        return 'float32'
+    if isinstance(val, int):
+        return 'int32'
+    if isinstance(val, str):
+        return 'string'
+    raise TypeError(f'Value \'{val}\' is not a recognized type')
+
+
 def dimension_picker(prefix, kernel_shape, suffix=''):
     """
     Returns the correct name for nth dimensional operator. Uses the 'kernel_shape' attribute.\n
@@ -348,7 +360,8 @@ def rcp_converter(data,
     if kwargs:
         __unexpected_attrs('rcp', kwargs)
 
-    return div_converter(_expr.const(1), data)
+    return div_converter(_expr.const(1, dtype=data.type_annotation.dtype), data)
+
 
 def exp_converter(data,
                   **kwargs):
@@ -711,7 +724,6 @@ def conv_converter(data,
     kernel_shape = infer_shape(kernel)
     dshape = infer_shape(data)
 
-
     strides = _stride_conv(stride, len(kernel_shape)) if stride \
         else (1,) * (len(kernel_shape) - 2)
 
@@ -801,7 +813,7 @@ def deconv_converter(data,
     else:
         # autopad is not usable here, manually calculate the padding
         data_sh = infer_shape(data)[2:]
-        out_sh = output_shape[2:]  # [(ui + (s - 1)) // s for ui, s in zip(data_sh, strides)]
+        out_sh = output_shape[2:] if output_shape else [(ui + (s - 1)) // s for ui, s in zip(data_sh, strides)]
         dilated = [(f - 1) * d + 1 for f, d in zip(kernel_shape[2:], dilation)]
         total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in
                  zip(out_sh, strides, dilated, data_sh)]
@@ -854,44 +866,52 @@ def box_converter(data,
 
     dshape = infer_shape(data)
 
-    # check if window size is 1 on N, C, avg pool only supports window on D H W
-    if size[:2] == [1, 1]:
-        out = avg_pool_converter(data, size[2:], border, padding, stride, dilation)
-        if not normalize:
-            out = mul_converter(out, _expr.const(math.prod(size), dtype='float32'))
-        return out
+    # TODO rewrite to conv with 1 filter and avg pool if normalize
 
-    # not efficient but works for any window size
+    if not normalize:
+        kernel = relay.ones(size, data.type_annotation.dtype)
+        return conv_converter(data, kernel, _expr.const(0, dtype=data.type_annotation.dtype), border, stride[2:], padding, dilation[2:], 1)
+    else:
+        return avg_pool_converter(data, size[2:], 'constant', padding, stride, dilation)
 
-    strides = stride if stride \
-        else (1,) * len(dshape)
-
-    dilation = dilation if dilation \
-        else (1,) * len(dshape)
-
-    # padding is truncated to `conv style` (only active layers are present)
-    active_shape = dshape[2:]
-    if not padding:
-        output = [(ui + (s - 1)) // s for ui, s in zip(active_shape, strides)]
-        dilated = [(f - 1) * d + 1 for f, d in zip(pool_size, dilation)]
-        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, strides, dilated, active_shape)]
-        padding = [(pad // 2, (pad + 1) // 2) for pad in total]
-
-    data = pad_converter(data, padding, border, _expr.const(0.0, 'float32'))
-
-    leave_out_dims = len([x for x in size if x == 1])
-
-    # generate widows
-    sw = get_relay_op('sliding_window')(data, leave_out_dims, size[leave_out_dims:], strides[leave_out_dims:])
-    # collapse generated windows that are over the dim of the input - the ones we need to sum
-    axes = [len(dshape) + x for x in range(len(dshape) - 2)]
-
-    # L2 normalize in sum_reduce is not good, so define own
-    out = sum_reduce_converter(sw, axes, False, keepdims=False)
-    if normalize:
-        rhs = _expr.const(np.full([infer_shape(out)], math.prod(size), dtype='float32'))
-        out = get_relay_op('divide')(out, rhs)
-    return out
+    # # check if window size is 1 on N, C, avg pool only supports window on D H W
+    # if size[:2] == [1, 1]:
+    #     out = avg_pool_converter(data, size[2:], 'constant', padding, stride, dilation)
+    #     if not normalize:
+    #         out = mul_converter(out, _expr.const(math.prod(size), dtype='float32'))
+    #     return out
+    #
+    # # not efficient but works for any window size
+    #
+    # strides = stride if stride \
+    #     else (1,) * len(dshape)
+    #
+    # dilation = dilation if dilation \
+    #     else (1,) * len(dshape)
+    #
+    # # padding is truncated to `conv style` (only active layers are present)
+    # active_shape = dshape[2:]
+    # if not padding:
+    #     output = [(ui + (s - 1)) // s for ui, s in zip(active_shape, strides)]
+    #     dilated = [(f - 1) * d + 1 for f, d in zip(size[2:], dilation)]
+    #     total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, strides, dilated, active_shape)]
+    #     padding = [(pad // 2, (pad + 1) // 2) for pad in total]
+    #
+    # data = pad_converter(data, padding, border, _expr.const(0.0, 'float32'))
+    #
+    # leave_out_dims = len([x for x in size if x == 1])
+    #
+    # # generate widows
+    # sw = get_relay_op('sliding_window')(data, leave_out_dims, size[leave_out_dims:], strides[leave_out_dims:])
+    # # collapse generated windows that are over the dim of the input - the ones we need to sum
+    # axes = [len(dshape) + x for x in range(len(dshape) - 2)]
+    #
+    # # L2 normalize in sum_reduce is not good, so define own
+    # out = sum_reduce_converter(sw, axes, False, keepdims=False)
+    # if normalize:
+    #     rhs = _expr.const(np.full([infer_shape(out)], math.prod(size), dtype='float32'))
+    #     out = get_relay_op('divide')(out, rhs)
+    # return out
 
 
 def debox_converter(data,
@@ -997,17 +1017,31 @@ def multilinear_upsample_converter(data,
     if kwargs:
         __unexpected_attrs('linear_upsample', kwargs)
 
-    # TODO method - border stuff ...
-    rank = len(infer_shape(data))
+    # test conversion to image.resizexd, re: discuss:11650
+    # TODO asymmetric doesn't work properly?
+    dshape = infer_shape(data)
+    new_size = [d * f for d, f in zip(dshape[2:], factor)]
+    if method == 'aligned':
+        mode = 'align_corners'
+    elif method == 'asymmetric':
+        mode = 'asymmetric'
+    else:
+        mode = 'half_pixel'  # todo check which is better default for symmetric?
+    op = get_relay_op(dimension_picker('resize', dshape))(
+        data,
+        new_size,
+        method='linear',
+        coordinate_transformation_mode=mode
+    )
+    return op
 
     if rank == 3:
         raise tvm.error.OpError('Upsampling on 1D tensor is not supported by TVM')
     if rank == 4:
-        return get_relay_op('upsampling')(data, factor[0], factor[1], method='bilinear')
+        return get_relay_op('upsampling')(data, factor[0], factor[1], method='bilinear',
+                                          align_corners=method == 'aligned')
     if rank == 5:
         return get_relay_op('upsampling3d')(data, factor[0], factor[1], factor[2], method='trilinear')
-
-    raise ValueError('sth very wrong')
 
 
 #   # Reduce ops
@@ -1382,8 +1416,17 @@ def linear_converter(data,
         __unexpected_attrs('linear', kwargs)
 
     out = get_relay_op('matmul')(data, filter, transpose_b=True)
+    res = None
 
-    return get_relay_op('add_bias')(out, bias)
+    if isinstance(bias, _expr.Constant):
+        if (bias.data.numpy() == 0).all():
+            res = out
+
+    if not res:
+        # squeeze needed bc nnef has bias of shape [1, channel]
+        res = _op.nn.bias_add(out, relay.squeeze(bias, axis=0))
+
+    return res
 
 
 # TODO separable conv/deconv
@@ -1765,7 +1808,10 @@ class NNEF_Converter:
                         self._nodes[f'{node.name}_{k}'] = _expr.const(np.array(ve, dtype=get_type(node.dtype)))
             else:
                 if v not in self._nodes.keys():
-                    dtype = 'float32' if not node.dtype else get_type(node.dtype)
+                    if node.dtype:
+                        dtype = get_type(node.dtype)
+                    else:
+                        dtype = infer_type(v)
                     self._nodes[f'{node.name}_{k}'] = _expr.const(np.array(v, dtype=dtype))
 
     def _set_parameter_span(self, node, node_source_name):
