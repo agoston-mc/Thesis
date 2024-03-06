@@ -738,14 +738,14 @@ def conv_converter(data,
         padding = [(pad // 2, (pad + 1) // 2) for pad in total]
 
     pad = _padding_conv(padding, len(kernel_shape))
-        # pad = (0,) * (len(kernel_shape) - 2)
-        # data = autopad(data,
-        #                strides,
-        #                kernel_shape[2:],
-        #                dilation,
-        #                # mode ?? == SAME UPPER currently seems fine
-        #                )
-        # # autopad seems equal to nnef autopadding equation
+    # pad = (0,) * (len(kernel_shape) - 2)
+    # data = autopad(data,
+    #                strides,
+    #                kernel_shape[2:],
+    #                dilation,
+    #                # mode ?? == SAME UPPER currently seems fine
+    #                )
+    # # autopad seems equal to nnef autopadding equation
 
     channels = kernel_shape[0]
 
@@ -820,9 +820,11 @@ def deconv_converter(data,
 
         pad = _padding_conv([(pad // 2, (pad + 1) // 2) for pad in total], rank)
 
-    channels = kernel_shape[0]
+    if groups == 0:
+        groups = kernel_shape[0]
+    channels = kernel_shape[1] * groups
 
-    # TODO convert output shape to output layout+padding
+    # # TODO convert output shape to output layout+padding
 
     op = get_relay_op(dimension_picker('conv', kernel_shape, suffix='_transpose'))
     deconv_out = op(
@@ -834,6 +836,7 @@ def deconv_converter(data,
         groups=groups,
         channels=channels,
         kernel_size=kernel_shape[2:],
+        # kernel_layout=layout
         # #defaults for 2d
         # data_layout="NCHW",
         # kernel_layout="OIHW",
@@ -866,13 +869,21 @@ def box_converter(data,
 
     dshape = infer_shape(data)
 
-    # TODO rewrite to conv with 1 filter and avg pool if normalize
-
-    if not normalize:
-        kernel = relay.ones(size, data.type_annotation.dtype)
-        return conv_converter(data, kernel, _expr.const(0, dtype=data.type_annotation.dtype), border, stride[2:], padding, dilation[2:], 1)
+    d_type = data.type_annotation.dtype
+    size[0] = dshape[1]
+    if normalize:
+        kernel = relay.full(_op.const(1 / math.prod(size[2:]), d_type), size, d_type)
     else:
-        return avg_pool_converter(data, size[2:], 'constant', padding, stride, dilation)
+        kernel = relay.ones(size, d_type)
+    out = conv_converter(data,
+                         kernel,
+                         _expr.const(0, dtype=data.type_annotation.dtype),
+                         border,
+                         stride,
+                         padding,
+                         dilation,
+                         dshape[1])
+    return out
 
     # # check if window size is 1 on N, C, avg pool only supports window on D H W
     # if size[:2] == [1, 1]:
@@ -921,11 +932,29 @@ def debox_converter(data,
                     stride,
                     dilation,
                     normalize,
+                    output_shape,
                     **kwargs):
     if kwargs:
         __unexpected_attrs('debox', kwargs)
 
-    return ndop
+    dshape = infer_shape(data)
+
+    d_type = data.type_annotation.dtype
+    size[0] = dshape[1]
+    if normalize:
+        kernel = relay.full(_op.const(1 / math.prod(size[2:]), d_type), size, d_type)
+    else:
+        kernel = relay.ones(size, d_type)
+    out = deconv_converter(data,
+                           kernel,
+                           _expr.const(0, dtype=data.type_annotation.dtype),
+                           border,
+                           stride,
+                           padding,
+                           dilation,
+                           output_shape,
+                           groups=dshape[1])
+    return out
 
 
 def argmax_pool_converter(data,
@@ -969,7 +998,7 @@ def nearest_downsample_converter(data,
                          border='constant',
                          padding=[(0, 0)] * dims,
                          stride=[1, 1] + factor,
-                         dilation=(1,) * dims,
+                         dilation=(1,) * (dims - 2),
                          normalize=False)
 
 
@@ -986,7 +1015,7 @@ def area_downsample_converter(data,
                          border='constant',
                          padding=[(0, 0)] * dims,
                          stride=[1, 1] + factor,
-                         dilation=(1,) * dims,
+                         dilation=(1,) * (dims - 2),
                          normalize=True)
 
 
