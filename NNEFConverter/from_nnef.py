@@ -1,6 +1,7 @@
 import math
 import os
 import itertools
+from functools import reduce
 
 import numpy as np
 
@@ -808,23 +809,30 @@ def deconv_converter(data,
     dilation = dilation if dilation else (
             (1,) * (rank - 2))
 
+    # autopad is not always usable here, manually calculate the padding
+    # values shape will be used later, so outside if
+    data_sh = infer_shape(data)[2:]
+    out_sh = output_shape[2:] if output_shape else [ui * s for ui, s in zip(data_sh, strides)]
+    dilated = [(f - 1) * d + 1 for f, d in zip(kernel_shape[2:], dilation)]
+    total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in
+             zip(data_sh, strides, dilated, out_sh)]
+
     if padding:
         pad = _padding_conv(padding, rank)
     else:
-        # autopad is not usable here, manually calculate the padding
-        data_sh = infer_shape(data)[2:]
-        out_sh = output_shape[2:] if output_shape else [(ui + (s - 1)) // s for ui, s in zip(data_sh, strides)]
-        dilated = [(f - 1) * d + 1 for f, d in zip(kernel_shape[2:], dilation)]
-        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in
-                 zip(out_sh, strides, dilated, data_sh)]
-
         pad = _padding_conv([(pad // 2, (pad + 1) // 2) for pad in total], rank)
 
     if groups == 0:
         groups = kernel_shape[0]
     channels = kernel_shape[1] * groups
 
-    # # TODO convert output shape to output layout+padding
+
+    out_pad = [(x - (y - t)) %s for x, y, t, s in zip(output_shape[2:], out_sh, total, stride)] if output_shape \
+        else (0,0)
+    # out_pad = (0,0)
+    # limit output paddig to < stride because of tvm
+    # todo test
+    # out_pad = [op % s for op, s in zip(out_pad, stride)]
 
     op = get_relay_op(dimension_picker('conv', kernel_shape, suffix='_transpose'))
     deconv_out = op(
@@ -836,6 +844,7 @@ def deconv_converter(data,
         groups=groups,
         channels=channels,
         kernel_size=kernel_shape[2:],
+        output_padding=out_pad,
         # kernel_layout=layout
         # #defaults for 2d
         # data_layout="NCHW",
@@ -1046,31 +1055,76 @@ def multilinear_upsample_converter(data,
     if kwargs:
         __unexpected_attrs('linear_upsample', kwargs)
 
-    # test conversion to image.resizexd, re: discuss:11650
-    # TODO asymmetric doesn't work properly?
+    # conversion from nn.upsampling to image.resizexd, re: discuss:11650
+    #
     dshape = infer_shape(data)
     new_size = [d * f for d, f in zip(dshape[2:], factor)]
     if method == 'aligned':
-        mode = 'align_corners'
-    elif method == 'asymmetric':
-        mode = 'asymmetric'
-    else:
-        mode = 'half_pixel'  # todo check which is better default for symmetric?
-    op = get_relay_op(dimension_picker('resize', dshape))(
-        data,
-        new_size,
-        method='linear',
-        coordinate_transformation_mode=mode
-    )
-    return op
+        return get_relay_op(dimension_picker('resize', dshape))(
+            data,
+            new_size,
+            method='linear',
+            coordinate_transformation_mode='align_corners',
+        )
+    if method == 'symmetric' and border == 'replicate':
+        return get_relay_op(dimension_picker('resize', dshape))(
+            data,
+            new_size,
+            method='linear',
+            coordinate_transformation_mode='half_pixel',
+        )
 
-    if rank == 3:
-        raise tvm.error.OpError('Upsampling on 1D tensor is not supported by TVM')
-    if rank == 4:
-        return get_relay_op('upsampling')(data, factor[0], factor[1], method='bilinear',
-                                          align_corners=method == 'aligned')
-    if rank == 5:
-        return get_relay_op('upsampling3d')(data, factor[0], factor[1], factor[2], method='trilinear')
+    def _upsample_weights_1d(factor, symmetric):
+        if symmetric:
+            weights = [1 - (i + 0.5) / factor for i in range(factor)]
+            weights = list(reversed(weights)) + weights
+        else:
+            weights = [1 - abs(i) / float(factor) for i in range(-factor + 1, factor)]
+        return np.array(weights)
+
+    def _upsample_weights_nd(factor, symmetric):
+        ws = [_upsample_weights_1d(f, symmetric) for f in factor]
+        return reduce(np.multiply, np.ix_(*ws))
+
+    n, c = dshape[:2]
+
+    symmetric = method == 'symmetric'
+    weights = _upsample_weights_nd(factor, symmetric)
+    weights = np.reshape(weights, newshape=(1, 1) + weights.shape)
+    filter = tile_converter(_expr.const(weights), (c, 1) + (1,) * len(factor))
+    # np.tile(np.reshape(weights, newshape=(1, 1) + weights.shape), reps=(c, 1) + (1,) * len(factor))
+
+    output_shape = [n, c] + [f * s for f, s in zip(factor, dshape[2:])]
+
+    debug_s = infer_shape(filter)
+    if symmetric:
+        return deconv_converter(data,
+                              filter,
+                              _expr.const(0.0),
+                              border='constant',
+                              stride=factor,
+                              padding=[(f - 1, f - 1) for f in factor],
+                              dilation=[],
+                              groups=c,
+                              output_shape=output_shape,
+                              )
+    else:
+        replicate = border == 'replicate'
+        if replicate:
+            data = pad_converter(data, [(0, 0), (0, 0)] + [(1, 0)] * len(factor), border, _expr.const(0.0))
+                # nnef_pad(input, padding=[(0, 0), (0, 0)] + [(1, 0)] * rank, border=border)
+
+        padding = factor if replicate else [f // 2 for f in factor]
+        return deconv_converter(data,
+                              filter,
+                              _expr.const(0.0),
+                              border='constant',
+                              stride=factor,
+                              padding=[(p, p) for p in padding],
+                              dilation=[],
+                              groups=c,
+                              output_shape=output_shape,
+                              )
 
 
 #   # Reduce ops
@@ -1530,6 +1584,11 @@ def max_pool_converter(data,
         padding = [(pad // 2, (pad + 1) // 2) for pad in total]
 
     pad = _padding_conv(padding, rank)
+
+    if border == 'constant':
+        padding = [(0,0),(0,0)] + padding
+        data = pad_converter(data, padding, border, _expr.const(0.0))
+        pad = (0,0)
 
     op = get_relay_op(dimension_picker('max_pool', dshape))
     return op(data,
