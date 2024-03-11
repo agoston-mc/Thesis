@@ -826,9 +826,8 @@ def deconv_converter(data,
         groups = kernel_shape[0]
     channels = kernel_shape[1] * groups
 
-
-    out_pad = [(x - (y - t)) %s for x, y, t, s in zip(output_shape[2:], out_sh, total, stride)] if output_shape \
-        else (0,0)
+    out_pad = [(x - (y - t)) % s for x, y, t, s in zip(output_shape[2:], out_sh, total, stride)] if output_shape \
+        else (0, 0)
     # out_pad = (0,0)
     # limit output paddig to < stride because of tvm
     # todo test
@@ -1096,18 +1095,17 @@ def multilinear_upsample_converter(data,
 
     output_shape = [n, c] + [f * s for f, s in zip(factor, dshape[2:])]
 
-    debug_s = infer_shape(filter)
     if symmetric:
         return deconv_converter(data,
-                              filter,
-                              _expr.const(0.0),
-                              border='constant',
-                              stride=factor,
-                              padding=[(f - 1, f - 1) for f in factor],
-                              dilation=[],
-                              groups=c,
-                              output_shape=output_shape,
-                              )
+                                filter,
+                                _expr.const(0.0),
+                                border='constant',
+                                stride=factor,
+                                padding=[(f - 1, f - 1) for f in factor],
+                                dilation=[],
+                                groups=c,
+                                output_shape=output_shape,
+                                )
     else:
         replicate = border == 'replicate'
         if replicate:
@@ -1116,15 +1114,15 @@ def multilinear_upsample_converter(data,
 
         padding = factor if replicate else [f // 2 for f in factor]
         return deconv_converter(data,
-                              filter,
-                              _expr.const(0.0),
-                              border='constant',
-                              stride=factor,
-                              padding=[(p, p) for p in padding],
-                              dilation=[],
-                              groups=c,
-                              output_shape=output_shape,
-                              )
+                                filter,
+                                _expr.const(0.0),
+                                border='constant',
+                                stride=factor,
+                                padding=[(p, p) for p in padding],
+                                dilation=[],
+                                groups=c,
+                                output_shape=output_shape,
+                                )
 
 
 #   # Reduce ops
@@ -1586,9 +1584,9 @@ def max_pool_converter(data,
     pad = _padding_conv(padding, rank)
 
     if border == 'constant':
-        padding = [(0,0),(0,0)] + padding
+        padding = [(0, 0), (0, 0)] + padding
         data = pad_converter(data, padding, border, _expr.const(0.0))
-        pad = (0,0)
+        pad = (0, 0)
 
     op = get_relay_op(dimension_picker('max_pool', dshape))
     return op(data,
