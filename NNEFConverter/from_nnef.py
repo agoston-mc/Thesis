@@ -649,7 +649,7 @@ def sqr_converter(data,
     if kwargs:
         __unexpected_attrs('sqr', kwargs)
 
-    return get_relay_op('power')(data, _expr.const(2.0,  dtype=data.type_annotation.dtype))
+    return get_relay_op('power')(data, _expr.const(2.0, dtype=data.type_annotation.dtype))
 
 
 def sqrt_converter(data,
@@ -665,7 +665,7 @@ def rsqr_converter(data,
     if kwargs:
         __unexpected_attrs('rsqr', kwargs)
 
-    return get_relay_op('power')(data, _expr.const(-2.0,  dtype=data.type_annotation.dtype))
+    return get_relay_op('power')(data, _expr.const(-2.0, dtype=data.type_annotation.dtype))
 
 
 def rsqrt_converter(data,
@@ -706,6 +706,8 @@ def clamp_converter(x, a, b,
         __unexpected_attrs('clamp', kwargs)
 
     return get_relay_op('clip')(x, b, a)
+
+
 # todo test case
 
 
@@ -1237,6 +1239,8 @@ def unsqueeze_converter(data,
 
         data = _op.expand_dims(data, axis=axis, num_newaxis=1)
     return data
+
+
 # todo test?
 
 
@@ -1286,6 +1290,8 @@ def stack_converter(*data,
         __unexpected_attrs('stack', kwargs)
 
     return get_relay_op('stack')(data, axis)
+
+
 # todo test
 
 
@@ -1300,6 +1306,8 @@ def unstack_converter(data,
     for i in range(len(split)):
         res.append(squeeze_converter(split[i], axis))
     return _expr.TupleWrapper(relay.Tuple(res), len(res))
+
+
 # todo test
 
 
@@ -1316,6 +1324,8 @@ def slice_converter(data,
     stride = [1] * len(axes)
 
     return get_relay_op('strided_slice')(data, begin, end, strides=stride, axes=axes)
+
+
 # todo test
 
 
@@ -1368,6 +1378,8 @@ def matmul_converter(a, b, transposeA, transposeB, **kwargs):
     out = _op.nn.matmul(a, b, transpose_a=transposeA, transpose_b=transposeB)
 
     return out
+
+
 # todo test all dims
 
 #   # Variable updates
@@ -1515,6 +1527,8 @@ def separable_conv_converter(data,
     filtered = conv_converter(data, plane_filter, [], border, stride, padding, dilation, groups)
 
     return conv_converter(filtered, point_filter, bias, [], [], [], [], groups)
+
+
 # todo test
 
 
@@ -1534,6 +1548,8 @@ def separable_deconv_converter(data,
     filtered = deconv_converter(data, plane_filter, [], border, stride, padding, dilation, [], groups)
 
     return deconv_converter(filtered, point_filter, bias, [], [], [], [], [], groups)
+
+
 # todo test
 
 
@@ -1781,7 +1797,7 @@ class NNEF_Converter:
 
     def _parse_inputs(self, graph: nnef.Graph):
         for inp in graph.inputs:
-            if inp in self._params:  # TODO- maybe deletable
+            if inp in self._params:
                 self._num_params += 1
                 self._nodes[inp] = new_var(inp, shape=self._params[inp].shape, dtype=self._params[inp].dtype)
             elif inp in self._nodes:
@@ -1796,21 +1812,23 @@ class NNEF_Converter:
         for op in graph.operations:
             if op.name == 'external':
                 continue
+
             if op.name == 'variable':
-                # TODO convert params to const, or leave variable (freeze vars switch)
+                # TODO ? convert params to const, or leave variable (freeze vars switch needed?)
                 i_tens = graph.tensors[op.outputs['output']]
                 tens_data = i_tens.data
                 self._nodes[i_tens.name] = new_var(i_tens.name, shape=op.attribs['shape'],
                                                    dtype=get_type(i_tens.dtype))
                 self._params[i_tens.name] = tens_data
+
             elif op.name == 'constant':
                 self._set_const(op)
+
             else:
                 self._set_literal_inputs(op)
                 self._set_parameter_span(op, op.name)
                 inputs = []
-                for ink, inv in op.inputs.items():  # TODO DONE handle default values, without identifier
-                    # Extension for list input parameters
+                for ink, inv in op.inputs.items():
                     if isinstance(inv, list):
                         for i, linv in enumerate(inv):
                             if linv in self._nodes.keys():
@@ -1821,6 +1839,7 @@ class NNEF_Converter:
                                     inputs.append(self._nodes[name])
                                 else:
                                     print(f'Invalid input node for {op.name}')
+
                     else:
                         if inv in self._nodes.keys():
                             inputs.append(self._nodes[inv])
@@ -1858,12 +1877,6 @@ class NNEF_Converter:
                 else:
                     for i, out in zip(range(outputs_num), op.outputs['values']):
                         self._nodes[out] = converted[i]
-                    # pass
-
-                    # raise NotImplementedError(f'Multiple outputs are not supported. Raised by {op.name}.')
-                    # node_output = None
-                    # for k, i in zip(list(node_output), range(len(node_output))):
-                    #     self._nodes[k] = op[i]
 
     def _set_const(self, node):
         name = node.outputs['output']
@@ -1882,6 +1895,7 @@ class NNEF_Converter:
                 for ve in v:
                     if ve not in self._nodes.keys():
                         self._nodes[f'{node.name}_{k}'] = _expr.const(np.array(ve, dtype=get_type(node.dtype)))
+
             else:
                 if v not in self._nodes.keys():
                     if node.dtype:
@@ -1903,7 +1917,8 @@ class NNEF_Converter:
         if isinstance(expr, (relay.Var, relay.Constant)):
             if isinstance(expr, relay.Constant):
                 if name not in self._consts:
-                    name = f'{node.name}_'  # TODO# deleted a {k}
+                    name = f'{node.name}_const'
+
             expr_with_span = set_span(expr, make_parameter_span([node_source_name, name]))
             self._nodes[name] = expr_with_span
             if name in self._inputs:
