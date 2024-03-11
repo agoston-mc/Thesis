@@ -332,8 +332,10 @@ def _get_converter_map():
     }
 
 
-def ndop(*args, **kwargs):  # TODO not implemented ops
-    print(args, kwargs)
+# not implemented ops
+# TODO maybe should be removed and independent not impl errors?
+def ndop(*args, **kwargs):
+    # print(args, kwargs)
     raise NotImplementedError
 
 
@@ -647,7 +649,7 @@ def sqr_converter(data,
     if kwargs:
         __unexpected_attrs('sqr', kwargs)
 
-    return get_relay_op('power')(data, _expr.const(2.0))
+    return get_relay_op('power')(data, _expr.const(2.0,  dtype=data.type_annotation.dtype))
 
 
 def sqrt_converter(data,
@@ -663,7 +665,7 @@ def rsqr_converter(data,
     if kwargs:
         __unexpected_attrs('rsqr', kwargs)
 
-    return get_relay_op('power')(data, _expr.const(-2.0))
+    return get_relay_op('power')(data, _expr.const(-2.0,  dtype=data.type_annotation.dtype))
 
 
 def rsqrt_converter(data,
@@ -701,9 +703,10 @@ def max_converter(lhs, rhs,
 def clamp_converter(x, a, b,
                     **kwargs):
     if kwargs:
-        __unexpected_attrs('max', kwargs)
+        __unexpected_attrs('clamp', kwargs)
 
     return get_relay_op('clip')(x, b, a)
+# todo test case
 
 
 #   # Sliding-window ops
@@ -733,20 +736,13 @@ def conv_converter(data,
 
     active_shape = dshape[2:]
     if not padding:
+        # ordering of nnef autopad and tvm autopad sometimes is different, implementing nnef style padding calculation
         output = [(ui + (s - 1)) // s for ui, s in zip(active_shape, strides)]
         dilated = [(f - 1) * d + 1 for f, d in zip(kernel_shape[2:], dilation)]
         total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, strides, dilated, active_shape)]
         padding = [(pad // 2, (pad + 1) // 2) for pad in total]
 
     pad = _padding_conv(padding, len(kernel_shape))
-    # pad = (0,) * (len(kernel_shape) - 2)
-    # data = autopad(data,
-    #                strides,
-    #                kernel_shape[2:],
-    #                dilation,
-    #                # mode ?? == SAME UPPER currently seems fine
-    #                )
-    # # autopad seems equal to nnef autopad equation
 
     channels = kernel_shape[0]
 
@@ -763,26 +759,21 @@ def conv_converter(data,
         groups=groups,
         channels=channels,
         kernel_size=kernel_shape[2:],
-        # #defaults for 2d
-        # data_layout="NCHW",
-        # kernel_layout="OIHW",
-        # out_layout="",
-        # out_dtype=""
     )
 
     res = None
     if isinstance(bias, _expr.Constant):
+        # nnef has bias of 0 if it is not needed
         if (bias.data.numpy() == 0).all():
             res = conv_out
 
     if not res:
-        # squeeze needed bc nnef has bias of shape [1, channel]
+        # squeeze needed as nnef has bias of shape [1, channel]
         res = _op.nn.bias_add(conv_out, relay.squeeze(bias, axis=0))
 
     return res
 
 
-# TODO test this, output shape might be wrong?
 def deconv_converter(data,
                      kernel,
                      bias,
@@ -810,7 +801,7 @@ def deconv_converter(data,
             (1,) * (rank - 2))
 
     # autopad is not always usable here, manually calculate the padding
-    # values shape will be used later, so outside if
+    # values shape will be used later, needed outside else block
     data_sh = infer_shape(data)[2:]
     out_sh = output_shape[2:] if output_shape else [ui * s for ui, s in zip(data_sh, strides)]
     dilated = [(f - 1) * d + 1 for f, d in zip(kernel_shape[2:], dilation)]
@@ -826,12 +817,10 @@ def deconv_converter(data,
         groups = kernel_shape[0]
     channels = kernel_shape[1] * groups
 
+    # limit output padding to modulo stride because of tvm checks
     out_pad = [(x - (y - t)) % s for x, y, t, s in zip(output_shape[2:], out_sh, total, stride)] if output_shape \
         else (0, 0)
-    # out_pad = (0,0)
-    # limit output paddig to < stride because of tvm
-    # todo test
-    # out_pad = [op % s for op, s in zip(out_pad, stride)]
+    # todo test if that can be larger for nnef?
 
     op = get_relay_op(dimension_picker('conv', kernel_shape, suffix='_transpose'))
     deconv_out = op(
@@ -844,12 +833,6 @@ def deconv_converter(data,
         channels=channels,
         kernel_size=kernel_shape[2:],
         output_padding=out_pad,
-        # kernel_layout=layout
-        # #defaults for 2d
-        # data_layout="NCHW",
-        # kernel_layout="OIHW",
-        # out_layout="",
-        # out_dtype=""
     )
 
     res = None
@@ -1035,6 +1018,7 @@ def nearest_upsample_converter(data,
 
     rank = len(infer_shape(data))
 
+    # TODO rewrite image.resizexd as multilinear
     if rank == 3:
         raise tvm.error.OpError('Upsampling on 1D tensor is not supported by TVM')
     if rank == 4:
@@ -1245,13 +1229,15 @@ def unsqueeze_converter(data,
                         **kwargs):
     if kwargs:
         __unexpected_attrs('unsqueeze', kwargs)
-    # TODO testing how axes is built up
+
     axes = sorted(axes)
     for axis in axes:
         if axis < 0 and isinstance(data, _expr.Var):
             axis = len(data.type_annotation.concrete_shape) + len(axes) + axis
+
         data = _op.expand_dims(data, axis=axis, num_newaxis=1)
     return data
+# todo test?
 
 
 def transpose_converter(data,
@@ -1278,7 +1264,7 @@ def split_converter(data,
     indices = []
     for r in ratio_list[:-1]:
         s += r
-        # Strictly needs int ...
+        # Strictly needs int
         indices.append(int(s))
 
     return get_relay_op('split')(data, indices, axis)
@@ -1300,9 +1286,9 @@ def stack_converter(*data,
         __unexpected_attrs('stack', kwargs)
 
     return get_relay_op('stack')(data, axis)
+# todo test
 
 
-# TODO unstack
 def unstack_converter(data,
                       axis,
                       **kwargs):
@@ -1314,6 +1300,7 @@ def unstack_converter(data,
     for i in range(len(split)):
         res.append(squeeze_converter(split[i], axis))
     return _expr.TupleWrapper(relay.Tuple(res), len(res))
+# todo test
 
 
 def slice_converter(data,
@@ -1329,6 +1316,7 @@ def slice_converter(data,
     stride = [1] * len(axes)
 
     return get_relay_op('strided_slice')(data, begin, end, strides=stride, axes=axes)
+# todo test
 
 
 def pad_converter(data,
@@ -1359,7 +1347,7 @@ def tile_converter(data,
 
 #   # Region-of-interest ops
 
-# TODO- roi pools ??
+# TODO-? roi pools ??
 
 
 #   # Matrix multiplication
@@ -1380,7 +1368,7 @@ def matmul_converter(a, b, transposeA, transposeB, **kwargs):
     out = _op.nn.matmul(a, b, transpose_a=transposeA, transpose_b=transposeB)
 
     return out
-
+# todo test all dims
 
 #   # Variable updates
 #   # Compound ops
@@ -1451,6 +1439,7 @@ def gelu_converter(data,
     if kwargs:
         __unexpected_attrs('gelu', kwargs)
 
+    # NNEF definition for gelu:
     # the exact definition of gelu is x * Phi(x) where Phi(x) is the
     # CDF of the standard normal distribution, which can be approximated
     # for example by sigmoid(1.702 * x)
@@ -1510,8 +1499,6 @@ def linear_converter(data,
     return res
 
 
-# TODO separable conv/deconv
-
 def separable_conv_converter(data,
                              plane_filter,
                              point_filter,
@@ -1528,6 +1515,7 @@ def separable_conv_converter(data,
     filtered = conv_converter(data, plane_filter, [], border, stride, padding, dilation, groups)
 
     return conv_converter(filtered, point_filter, bias, [], [], [], [], groups)
+# todo test
 
 
 def separable_deconv_converter(data,
@@ -1546,6 +1534,7 @@ def separable_deconv_converter(data,
     filtered = deconv_converter(data, plane_filter, [], border, stride, padding, dilation, [], groups)
 
     return deconv_converter(filtered, point_filter, bias, [], [], [], [], [], groups)
+# todo test
 
 
 # TODO--- max_pool_with_index == argmax pool sol
@@ -1656,7 +1645,8 @@ def rms_pool(data,
             border=border,
             padding=padding,
             stride=stride,
-            dilation=dilation))
+            dilation=dilation,
+        ))
 
 
 #   # Normalization
@@ -1670,8 +1660,8 @@ def local_response_normalization_converter(data,
     if len(axis) == 1:
         axis = axis[0]
     else:
-        print("Multi axis LRN is not implemented properly, using axis = 1")
-        axis = 1
+        print("Multi axis LRN is not implemented properly, using first axis where size != 1")
+        axis = axis[0]
     size = size[axis]
     return get_relay_op('lrn')(data,
                                size,
