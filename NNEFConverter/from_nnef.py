@@ -180,7 +180,7 @@ def _padding_conv(padding, rank, keepdims=False):
                                                                            'Padding on C,I dimensions not supported')
                     # itertools faster barely
                     return list(itertools.chain.from_iterable(zip(padding[2], padding[3], padding[4])))
-                # {sliding window style} :: [(batch),(channel),(f,b),(u,d),(l,r)] -> [(batch),(channel),(f,b),(u,d),(l,r)]
+                # {s-w style} :: [(batch),(channel),(f,b),(u,d),(l,r)] -> [(batch),(channel),(f,b),(u,d),(l,r)]
                 else:
                     return padding
 
@@ -333,7 +333,7 @@ def _get_converter_map():
 
 
 # not implemented ops
-# TODO maybe should be removed and independent not impl errors?
+# TODO maybe should be replaced by independent not impl errors?
 def ndop(*args, **kwargs):
     # print(args, kwargs)
     raise NotImplementedError
