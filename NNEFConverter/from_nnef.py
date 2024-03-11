@@ -1018,18 +1018,16 @@ def nearest_upsample_converter(data,
     if kwargs:
         __unexpected_attrs('nearest_upsample', kwargs)
 
-    rank = len(infer_shape(data))
-
-    # TODO rewrite image.resizexd as multilinear
-    if rank == 3:
-        raise tvm.error.OpError('Upsampling on 1D tensor is not supported by TVM')
-    if rank == 4:
-        return get_relay_op('upsampling')(data, factor[0], factor[1], method='nearest_neighbor')
-    if rank == 5:
-        return get_relay_op('upsampling3d')(data, factor[0], factor[1], factor[2], method='nearest_neighbor',
-                                            coordinate_transformation_mode='asymmetric')
-
-    raise ValueError('sth very wrong')
+    # conversion from nn.upsampling to image.resizexd, re: discuss:11650
+    #
+    dshape = infer_shape(data)
+    new_size = [d * f for d, f in zip(dshape[2:], factor)]
+    return get_relay_op(dimension_picker('resize', dshape))(
+        data,
+        new_size,
+        method='nearest_neighbor',
+        coordinate_transformation_mode='asymmetric'
+    )
 
 
 def multilinear_upsample_converter(data,
