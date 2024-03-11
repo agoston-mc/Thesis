@@ -14,7 +14,7 @@ from tvm.relay import analysis, function
 from tvm.relay import expr as _expr
 from tvm.relay import op as _op
 from tvm.relay.frontend.common \
-    import (new_var, get_relay_op, fold_constant, set_span, infer_shape, autopad)
+    import (new_var, get_relay_op, fold_constant, set_span, infer_shape)
 
 
 # infer_type
@@ -318,7 +318,7 @@ def _get_converter_map():
         'local_mean_normalization': local_mean_normalization_converter,
         'local_variance_normalization': local_variance_normalization_converter,
         'local_contrast_normalization': local_contrast_normalization_converter,
-        'l1_normalization': l1_normaliyation_converter,
+        'l1_normalization': l1_normalization_converter,
         'l2_normalization': l2_normalization_converter,
         'batch_normalization': batch_normalization_converter,
         'min_max_linear_quantize': ndop,  # quantization
@@ -746,7 +746,7 @@ def conv_converter(data,
     #                dilation,
     #                # mode ?? == SAME UPPER currently seems fine
     #                )
-    # # autopad seems equal to nnef autopadding equation
+    # # autopad seems equal to nnef autopad equation
 
     channels = kernel_shape[0]
 
@@ -1073,16 +1073,16 @@ def multilinear_upsample_converter(data,
             coordinate_transformation_mode='half_pixel',
         )
 
-    def _upsample_weights_1d(factor, symmetric):
-        if symmetric:
-            weights = [1 - (i + 0.5) / factor for i in range(factor)]
-            weights = list(reversed(weights)) + weights
+    def _upsample_weights_1d(fact, symm):
+        if symm:
+            ws = [1 - (i + 0.5) / fact for i in range(fact)]
+            ws = list(reversed(ws)) + ws
         else:
-            weights = [1 - abs(i) / float(factor) for i in range(-factor + 1, factor)]
-        return np.array(weights)
+            ws = [1 - abs(i) / float(fact) for i in range(-fact + 1, fact)]
+        return np.array(ws)
 
-    def _upsample_weights_nd(factor, symmetric):
-        ws = [_upsample_weights_1d(f, symmetric) for f in factor]
+    def _upsample_weights_nd(fact, symm):
+        ws = [_upsample_weights_1d(f, symm) for f in fact]
         return reduce(np.multiply, np.ix_(*ws))
 
     n, c = dshape[:2]
@@ -1090,14 +1090,14 @@ def multilinear_upsample_converter(data,
     symmetric = method == 'symmetric'
     weights = _upsample_weights_nd(factor, symmetric)
     weights = np.reshape(weights, newshape=(1, 1) + weights.shape)
-    filter = tile_converter(_expr.const(weights), (c, 1) + (1,) * len(factor))
+    kernel = tile_converter(_expr.const(weights), (c, 1) + (1,) * len(factor))
     # np.tile(np.reshape(weights, newshape=(1, 1) + weights.shape), reps=(c, 1) + (1,) * len(factor))
 
     output_shape = [n, c] + [f * s for f, s in zip(factor, dshape[2:])]
 
     if symmetric:
         return deconv_converter(data,
-                                filter,
+                                kernel,
                                 _expr.const(0.0),
                                 border='constant',
                                 stride=factor,
@@ -1110,11 +1110,11 @@ def multilinear_upsample_converter(data,
         replicate = border == 'replicate'
         if replicate:
             data = pad_converter(data, [(0, 0), (0, 0)] + [(1, 0)] * len(factor), border, _expr.const(0.0))
-                # nnef_pad(input, padding=[(0, 0), (0, 0)] + [(1, 0)] * rank, border=border)
+            # nnef_pad(input, padding=[(0, 0), (0, 0)] + [(1, 0)] * rank, border=border)
 
         padding = factor if replicate else [f // 2 for f in factor]
         return deconv_converter(data,
-                                filter,
+                                kernel,
                                 _expr.const(0.0),
                                 border='constant',
                                 stride=factor,
@@ -1717,7 +1717,7 @@ def local_contrast_normalization_converter(data,
     return local_variance_normalization_converter(centered, size, bias, epsilon)
 
 
-def l1_normaliyation_converter(data,
+def l1_normalization_converter(data,
                                axes,
                                bias,
                                epsilon,
@@ -1841,7 +1841,7 @@ class NNEF_Converter:
                             else:
                                 print('Invalid input node for op')
 
-                converted = self._get_relay_opcall(op.name, inputs, op.attribs)
+                converted = self._get_relay_op_call(op.name, inputs, op.attribs)
 
                 if not isinstance(converted, _expr.TupleWrapper):
                     outputs_num = 1
@@ -1919,7 +1919,7 @@ class NNEF_Converter:
             if name in self._inputs:
                 self._inputs[name] = expr_with_span
 
-    def _get_relay_opcall(self, name, inputs, attrs):
+    def _get_relay_op_call(self, name, inputs, attrs):
         conv_map = _get_converter_map()
         if name in conv_map:
             call = conv_map[name](*inputs, **attrs)
