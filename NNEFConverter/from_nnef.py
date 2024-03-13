@@ -7,20 +7,18 @@ from tvm.ir import IRModule
 from tvm.relay import analysis, function
 from tvm.relay.frontend.common import new_var, fold_constant, set_span
 
-# infer_type
-# from tvm.topi import get_const_tuple
-
 
 # Converter class
 class NNEF_Converter:
 
-    def __init__(self):
+    def __init__(self, freeze_vars):
         self._nodes = {}
         self._consts = {}
         self._inputs = {}
         self._num_inputs = 0
         self._params = {}
         self._num_params = 0
+        self._freeze_vars = freeze_vars
 
     def from_nnef(self, graph):
         self._parse_inputs(graph)
@@ -57,12 +55,15 @@ class NNEF_Converter:
                 continue
 
             if op.name == 'variable':
-                # TODO ? convert params to const, or leave variable (freeze vars switch needed?)
-                i_tens = graph.tensors[op.outputs['output']]
-                tens_data = i_tens.data
-                self._nodes[i_tens.name] = new_var(i_tens.name, shape=op.attribs['shape'],
-                                                   dtype=get_type(i_tens.dtype))
-                self._params[i_tens.name] = tens_data
+                tensor = graph.tensors[op.outputs['output']]
+                tens_data = tensor.data
+                if self._freeze_vars:
+                    self._consts[tensor.name] = tmv_expr.const(tens_data)
+                    self._nodes[tensor.name] = self._consts[tensor.name]
+                else:
+                    self._nodes[tensor.name] = new_var(tensor.name, shape=op.attribs['shape'],
+                                                       dtype=get_type(tensor.dtype))
+                    self._params[tensor.name] = tens_data
 
             elif op.name == 'constant':
                 self._set_const(op)
@@ -179,12 +180,13 @@ class NNEF_Converter:
 
 
 def from_nnef(
-        model_path: os.PathLike | str
+        model_path: os.PathLike | str,
+        freeze_vars=False
 ):
     """
     :return: (mod, params) : (tvm.IRModule, dict of str and tvm.nd.NDArray)
     """
-    par = NNEF_Converter()
+    par = NNEF_Converter(freeze_vars)
     model = nnef.load_graph(model_path)
     nnef.infer_shapes(model)
     return par.from_nnef(graph=model)
