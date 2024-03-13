@@ -191,6 +191,14 @@ def _calculate_nnef_padding(active_shape, strides, kernel_shape, dilation):
     return padding
 
 
+def _calculate_nnef_padding_deconv(data_sh, strides, kernel_active_sh, dilation, output_shape):
+    out_sh = output_shape[2:] if output_shape else [ui * s for ui, s in zip(data_sh, strides)]
+    dilated = [(f - 1) * d + 1 for f, d in zip(kernel_active_sh[2:], dilation)]
+    total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in
+             zip(data_sh, strides, dilated, out_sh)]
+    return total, out_sh
+
+
 def make_parameter_span(source_name_list, name_sep="."):
     return name_sep.join(source_name_list)
 
@@ -799,14 +807,7 @@ def deconv_converter(data,
     dilation = dilation if dilation else (
             (1,) * (rank - 2))
 
-    # autopad is not always usable here, manually calculate the padding
-    # values shape will be used later, needed outside else block
-    #TODO copy to outer func
-    data_sh = infer_shape(data)[2:]
-    out_sh = output_shape[2:] if output_shape else [ui * s for ui, s in zip(data_sh, strides)]
-    dilated = [(f - 1) * d + 1 for f, d in zip(kernel_shape[2:], dilation)]
-    total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in
-             zip(data_sh, strides, dilated, out_sh)]
+    total, out_sh = _calculate_nnef_padding_deconv(infer_shape(data), strides, kernel_shape, dilation, output_shape)
 
     if padding:
         pad = _padding_conv(padding, rank)
@@ -1342,7 +1343,7 @@ def tile_converter(data,
 
 #   # Region-of-interest ops
 
-# TODO-? roi pools ??
+# TODO- roi pools
 
 
 #   # Matrix multiplication
@@ -1350,15 +1351,7 @@ def matmul_converter(a, b, transposeA, transposeB, **kwargs):
     if kwargs:
         __unexpected_attrs('matmul', kwargs)
 
-    # TODO batch matmul
-    # a_shape = infer_shape(a)
-    # a_ndims = len(a_shape)
-    #
-    # b_shape = infer_shape(b)
-    # b_ndims = len(b_shape)
-    #
-    # # TODO? check sizes
-    #
+    # TODO batch matmul if needed
 
     out = _op.nn.matmul(a, b, transpose_a=transposeA, transpose_b=transposeB)
 
@@ -1490,7 +1483,7 @@ def linear_converter(data,
             res = out
 
     if not res:
-        # squeeze needed bc nnef has bias of shape [1, channel]
+        # squeeze needed because nnef has bias of shape [1, channel]
         res = _op.nn.bias_add(out, relay.squeeze(bias, axis=0))
 
     return res
@@ -1537,8 +1530,6 @@ def separable_deconv_converter(data,
 
 # todo test
 
-
-# TODO--- max_pool_with_index == argmax pool sol
 
 def max_pool_converter(data,
                        size,

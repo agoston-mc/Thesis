@@ -38,12 +38,6 @@ class NNEF_Converter:
 
     def _parse_inputs(self, graph: nnef.Graph):
         for inp in graph.inputs:
-            # if inp in self._params:
-            #     self._num_params += 1
-            #     self._nodes[inp] = new_var(inp, shape=self._params[inp].shape, dtype=self._params[inp].dtype)
-            # elif inp in self._nodes:
-            #     continue
-            # else:
             self._num_inputs += 1
             i_tens = graph.tensors[inp]
             self._nodes[inp] = new_var(inp, shape=i_tens.shape, dtype=get_type(i_tens.dtype))
