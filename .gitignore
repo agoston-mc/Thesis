@@ -1,1 +1,4 @@
 /NNEFConverter/.pkl_memoize_py3/
+/nnef-cts/outputs/
+/build/
+*.egg-info

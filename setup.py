@@ -2,8 +2,8 @@ import setuptools
 
 
 setuptools.setup(
-    name='nnef-converter',
-    version='0.2',
+    name='nnef-to-tvm-converter',
+    version='0.3',
     packages=['NNEFConverter']
 )
 
