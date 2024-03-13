@@ -257,10 +257,10 @@ def _get_converter_map():
         'conv': conv_converter,
         'deconv': deconv_converter,
         'box': box_converter,
-        'debox': debox_converter,  # td? not impl
-        'argmax_pool': argmax_pool_converter,  # ----  not impl
-        'sample': sample_converter,  # td? not impl
-        'desample': ndop,  # td? not impl
+        'debox': debox_converter,
+        'argmax_pool': ndop,
+        'sample': ndop,
+        'desample': ndop,
         'nearest_downsample': nearest_downsample_converter,
         'area_downsample': area_downsample_converter,
         'nearest_upsample': nearest_upsample_converter,
@@ -336,7 +336,7 @@ def _get_converter_map():
 # TODO maybe should be replaced by independent not impl errors?
 def ndop(*args, **kwargs):
     # print(args, kwargs)
-    raise NotImplementedError
+    raise Exception('Not supported operator was called, please check for compatilibty')
 
 
 #   # Unary ops
@@ -950,32 +950,20 @@ def debox_converter(data,
     return out
 
 
-def argmax_pool_converter(data,
-                          size,
-                          border,
-                          padding,
-                          stride,
-                          dilation,
-                          **kwargs):
-    if kwargs:
-        __unexpected_attrs('argmax_pool', kwargs)
-
-    raise NotImplementedError('argmax_pool not implemented')
-    # TODO maybe do it with slicing?
-
-
-def sample_converter(data,
-                     index,
-                     size,
-                     border,
-                     padding,
-                     stride,
-                     dilation,
-                     **kwargs):
-    if kwargs:
-        __unexpected_attrs('sample', kwargs)
-
-    return ndop
+# def argmax_pool_converter(data,
+#                           size,
+#                           border,
+#                           padding,
+#                           stride,
+#                           dilation,
+#                           **kwargs)
+#                           :
+#     # maybe possible with slicing?
+#
+#     if kwargs:
+#         __unexpected_attrs('argmax_pool', kwargs)
+#
+#     raise NotImplementedError('argmax_pool not implemented')
 
 
 def nearest_downsample_converter(data,
