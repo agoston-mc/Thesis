@@ -146,7 +146,7 @@ def _padding_conv(padding, rank, keepdims=False):
                 else:
                     return padding
 
-                    # 2D
+        # 2D
 
         if rank == 4:
             # {conv style} :: [(u,d),(l,r)] -> (u, l, d, r)
@@ -165,7 +165,7 @@ def _padding_conv(padding, rank, keepdims=False):
                 else:
                     return padding
 
-                    # 3D
+        # 3D
 
         if rank == 5:
             # {conv style} :: [(f,b),(u,d),(l,r)] -> (f, u, l, b, d, r)
@@ -188,7 +188,14 @@ def _padding_conv(padding, rank, keepdims=False):
                          f'supported, got {len(padding)}: {padding}')
 
     raise ValueError('nnef should not have singular padding')
-    # return padding
+
+
+def _calculate_nnef_padding(active_shape, strides, kernel_shape, dilation):
+    output = [(ui + (s - 1)) // s for ui, s in zip(active_shape, strides)]
+    dilated = [(f - 1) * d + 1 for f, d in zip(kernel_shape[2:], dilation)]
+    total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, strides, dilated, active_shape)]
+    padding = [(pad // 2, (pad + 1) // 2) for pad in total]
+    return padding
 
 
 def make_parameter_span(source_name_list, name_sep="."):
@@ -712,6 +719,8 @@ def clamp_converter(x, a, b,
 
 
 #   # Sliding-window ops
+
+
 def conv_converter(data,
                    kernel,
                    bias,
@@ -739,10 +748,7 @@ def conv_converter(data,
     active_shape = dshape[2:]
     if not padding:
         # ordering of nnef autopad and tvm autopad sometimes is different, implementing nnef style padding calculation
-        output = [(ui + (s - 1)) // s for ui, s in zip(active_shape, strides)]
-        dilated = [(f - 1) * d + 1 for f, d in zip(kernel_shape[2:], dilation)]
-        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, strides, dilated, active_shape)]
-        padding = [(pad // 2, (pad + 1) // 2) for pad in total]
+        padding = _calculate_nnef_padding(active_shape, strides, kernel_shape, dilation)
 
     pad = _padding_conv(padding, len(kernel_shape))
 
@@ -1568,10 +1574,7 @@ def max_pool_converter(data,
     # padding is truncated to `conv style` (only active layers are present)
     active_shape = dshape[2:]
     if not padding:
-        output = [(ui + (s - 1)) // s for ui, s in zip(active_shape, strides)]
-        dilated = [(f - 1) * d + 1 for f, d in zip(pool_size, dilation)]
-        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, strides, dilated, active_shape)]
-        padding = [(pad // 2, (pad + 1) // 2) for pad in total]
+        padding = _calculate_nnef_padding(active_shape, strides, pool_size, dilation)
 
     pad = _padding_conv(padding, rank)
 
@@ -1614,10 +1617,7 @@ def avg_pool_converter(data,
     # padding is truncated to `conv style` (only active layers are present)
     active_shape = dshape[2:]
     if not padding:
-        output = [(ui + (s - 1)) // s for ui, s in zip(active_shape, strides)]
-        dilated = [(f - 1) * d + 1 for f, d in zip(pool_size, dilation)]
-        total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, strides, dilated, active_shape)]
-        padding = [(pad // 2, (pad + 1) // 2) for pad in total]
+        padding = _calculate_nnef_padding(active_shape, strides, pool_size, dilation)
 
     pad = _padding_conv(padding, rank)
 
