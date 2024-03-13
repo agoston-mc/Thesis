@@ -1,10 +1,15 @@
+import os
 import nnef
 from nnef_ops import _get_converter_map
 from nnef_ops import *
 
+from tvm.ir import IRModule
+from tvm.relay import analysis, function
+from tvm.relay.frontend.common import new_var, fold_constant, set_span
 
 # infer_type
 # from tvm.topi import get_const_tuple
+
 
 # Converter class
 class NNEF_Converter:
@@ -162,7 +167,7 @@ class NNEF_Converter:
             if name in self._inputs:
                 self._inputs[name] = expr_with_span
 
-        raise InterpretationError(f'Failed to interpret {name}, while setting the span for {node_source_name}')
+        raise TypeError(f'Failed to interpret {name}, while setting the span for {node_source_name}')
 
     def _get_relay_op_call(self, name, inputs, attrs):
         conv_map = _get_converter_map()

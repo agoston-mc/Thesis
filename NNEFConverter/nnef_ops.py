@@ -1,5 +1,5 @@
 import math
-import os
+
 import itertools
 from functools import reduce
 
@@ -7,12 +7,10 @@ import numpy as np
 
 import tvm
 from tvm import relay
-from tvm.ir import IRModule
-from tvm.relay import analysis, function
+
 from tvm.relay import expr as tmv_expr
 from tvm.relay import op as _op
-from tvm.relay.frontend.common \
-    import (new_var, get_relay_op, fold_constant, set_span, infer_shape)
+from tvm.relay.frontend.common import get_relay_op, infer_shape
 
 
 # Base methods
