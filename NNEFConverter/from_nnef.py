@@ -2,6 +2,7 @@ import nnef
 from nnef_ops import _get_converter_map
 from nnef_ops import *
 
+
 # infer_type
 # from tvm.topi import get_const_tuple
 
