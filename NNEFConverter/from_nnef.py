@@ -11,7 +11,7 @@ import tvm
 from tvm import relay
 from tvm.ir import IRModule
 from tvm.relay import analysis, function
-from tvm.relay import expr as _expr
+from tvm.relay import expr as tmv_expr
 from tvm.relay import op as _op
 from tvm.relay.frontend.common \
     import (new_var, get_relay_op, fold_constant, set_span, infer_shape)
@@ -19,6 +19,11 @@ from tvm.relay.frontend.common \
 
 # infer_type
 # from tvm.topi import get_const_tuple
+
+
+class InterpretationError(Exception):
+    pass
+
 
 
 # Base methods
@@ -371,7 +376,7 @@ def rcp_converter(data,
     if kwargs:
         __unexpected_attrs('rcp', kwargs)
 
-    return div_converter(_expr.const(1, dtype=data.type_annotation.dtype), data)
+    return div_converter(tmv_expr.const(1, dtype=data.type_annotation.dtype), data)
 
 
 def exp_converter(data,
@@ -657,7 +662,7 @@ def sqr_converter(data,
     if kwargs:
         __unexpected_attrs('sqr', kwargs)
 
-    return get_relay_op('power')(data, _expr.const(2.0, dtype=data.type_annotation.dtype))
+    return get_relay_op('power')(data, tmv_expr.const(2.0, dtype=data.type_annotation.dtype))
 
 
 def sqrt_converter(data,
@@ -673,7 +678,7 @@ def rsqr_converter(data,
     if kwargs:
         __unexpected_attrs('rsqr', kwargs)
 
-    return get_relay_op('power')(data, _expr.const(-2.0, dtype=data.type_annotation.dtype))
+    return get_relay_op('power')(data, tmv_expr.const(-2.0, dtype=data.type_annotation.dtype))
 
 
 def rsqrt_converter(data,
@@ -769,7 +774,7 @@ def conv_converter(data,
     )
 
     res = None
-    if isinstance(bias, _expr.Constant):
+    if isinstance(bias, tmv_expr.Constant):
         # nnef has bias of 0 if it is not needed
         if (bias.data.numpy() == 0).all():
             res = conv_out
@@ -809,6 +814,7 @@ def deconv_converter(data,
 
     # autopad is not always usable here, manually calculate the padding
     # values shape will be used later, needed outside else block
+    #TODO copy to outer func
     data_sh = infer_shape(data)[2:]
     out_sh = output_shape[2:] if output_shape else [ui * s for ui, s in zip(data_sh, strides)]
     dilated = [(f - 1) * d + 1 for f, d in zip(kernel_shape[2:], dilation)]
@@ -843,7 +849,7 @@ def deconv_converter(data,
     )
 
     res = None
-    if isinstance(bias, _expr.Constant):
+    if isinstance(bias, tmv_expr.Constant):
         if bias.data.numpy() == np.array([0.0]):
             res = deconv_out
 
@@ -875,7 +881,7 @@ def box_converter(data,
         kernel = relay.ones(size, d_type)
     out = conv_converter(data,
                          kernel,
-                         _expr.const(0, dtype=data.type_annotation.dtype),
+                         tmv_expr.const(0, dtype=data.type_annotation.dtype),
                          border,
                          stride,
                          padding,
@@ -945,7 +951,7 @@ def debox_converter(data,
         kernel = relay.ones(size, d_type)
     out = deconv_converter(data,
                            kernel,
-                           _expr.const(0, dtype=data.type_annotation.dtype),
+                           tmv_expr.const(0, dtype=data.type_annotation.dtype),
                            border,
                            stride,
                            padding,
@@ -1068,7 +1074,7 @@ def multilinear_upsample_converter(data,
     symmetric = method == 'symmetric'
     weights = _upsample_weights_nd(factor, symmetric)
     weights = np.reshape(weights, newshape=(1, 1) + weights.shape)
-    kernel = tile_converter(_expr.const(weights), (c, 1) + (1,) * len(factor))
+    kernel = tile_converter(tmv_expr.const(weights), (c, 1) + (1,) * len(factor))
     # np.tile(np.reshape(weights, newshape=(1, 1) + weights.shape), reps=(c, 1) + (1,) * len(factor))
 
     output_shape = [n, c] + [f * s for f, s in zip(factor, dshape[2:])]
@@ -1076,7 +1082,7 @@ def multilinear_upsample_converter(data,
     if symmetric:
         return deconv_converter(data,
                                 kernel,
-                                _expr.const(0.0),
+                                tmv_expr.const(0.0),
                                 border='constant',
                                 stride=factor,
                                 padding=[(f - 1, f - 1) for f in factor],
@@ -1087,13 +1093,13 @@ def multilinear_upsample_converter(data,
     else:
         replicate = border == 'replicate'
         if replicate:
-            data = pad_converter(data, [(0, 0), (0, 0)] + [(1, 0)] * len(factor), border, _expr.const(0.0))
+            data = pad_converter(data, [(0, 0), (0, 0)] + [(1, 0)] * len(factor), border, tmv_expr.const(0.0))
             # nnef_pad(input, padding=[(0, 0), (0, 0)] + [(1, 0)] * rank, border=border)
 
         padding = factor if replicate else [f // 2 for f in factor]
         return deconv_converter(data,
                                 kernel,
-                                _expr.const(0.0),
+                                tmv_expr.const(0.0),
                                 border='constant',
                                 stride=factor,
                                 padding=[(p, p) for p in padding],
@@ -1226,7 +1232,7 @@ def unsqueeze_converter(data,
 
     axes = sorted(axes)
     for axis in axes:
-        if axis < 0 and isinstance(data, _expr.Var):
+        if axis < 0 and isinstance(data, tmv_expr.Var):
             axis = len(data.type_annotation.concrete_shape) + len(axes) + axis
 
         data = _op.expand_dims(data, axis=axis, num_newaxis=1)
@@ -1297,7 +1303,7 @@ def unstack_converter(data,
     res = []
     for i in range(len(split)):
         res.append(squeeze_converter(split[i], axis))
-    return _expr.TupleWrapper(relay.Tuple(res), len(res))
+    return tmv_expr.TupleWrapper(relay.Tuple(res), len(res))
 
 
 # todo test
@@ -1418,9 +1424,9 @@ def elu_converter(data,
     if kwargs:
         __unexpected_attrs('elu', kwargs)
 
-    return select_converter(lt_converter(data, _expr.const(0.0)),
-                            mul_converter(_expr.const(alpha),
-                                          sub_converter(exp_converter(data), _expr.const(1.0))),
+    return select_converter(lt_converter(data, tmv_expr.const(0.0)),
+                            mul_converter(tmv_expr.const(alpha),
+                                          sub_converter(exp_converter(data), tmv_expr.const(1.0))),
                             data)
 
 
@@ -1431,10 +1437,10 @@ def selu_converter(data,
     if kwargs:
         __unexpected_attrs('selu', kwargs)
 
-    return mul_converter(_expr.const(lambda_var),
-                         select_converter(data < _expr.const(0.0),
-                                          mul_converter(_expr.const(alpha),
-                                                        sub_converter(exp_converter(data), _expr.const(1.0))),
+    return mul_converter(tmv_expr.const(lambda_var),
+                         select_converter(data < tmv_expr.const(0.0),
+                                          mul_converter(tmv_expr.const(alpha),
+                                                        sub_converter(exp_converter(data), tmv_expr.const(1.0))),
                                           data))
 
 
@@ -1448,7 +1454,7 @@ def gelu_converter(data,
     # CDF of the standard normal distribution, which can be approximated
     # for example by sigmoid(1.702 * x)
 
-    return mul_converter(data, sigmoid_converter(mul_converter(_expr.const(1.702), data)))
+    return mul_converter(data, sigmoid_converter(mul_converter(tmv_expr.const(1.702), data)))
 
 
 def silu_converter(data,
@@ -1477,7 +1483,7 @@ def softplus_converter(data,
     if kwargs:
         __unexpected_attrs('softplus', kwargs)
 
-    return log_converter(add_converter(exp_converter(data), _expr.const(1.0)))
+    return log_converter(add_converter(exp_converter(data), tmv_expr.const(1.0)))
 
 
 #   # linear ops
@@ -1492,7 +1498,7 @@ def linear_converter(data,
     out = get_relay_op('matmul')(data, filter, transpose_b=True)
     res = None
 
-    if isinstance(bias, _expr.Constant):
+    if isinstance(bias, tmv_expr.Constant):
         if (bias.data.numpy() == 0).all():
             res = out
 
@@ -1578,7 +1584,7 @@ def max_pool_converter(data,
 
     if border == 'constant':
         padding = [(0, 0), (0, 0)] + padding
-        data = pad_converter(data, padding, border, _expr.const(0.0))
+        data = pad_converter(data, padding, border, tmv_expr.const(0.0))
         pad = (0, 0)
 
     op = get_relay_op(dimension_picker('max_pool', dshape))
@@ -1692,7 +1698,7 @@ def local_variance_normalization_converter(data,
 
     sigma = box_converter(sqr_converter(data), size, 'constant', [], [], [], normalize=True)
     return div_converter(data,
-                         max_converter(add_converter(sqrt_converter(sigma), _expr.const(bias)),
+                         max_converter(add_converter(sqrt_converter(sigma), tmv_expr.const(bias)),
                                        epsilon))
 
 
@@ -1717,7 +1723,7 @@ def l1_normalization_converter(data,
         __unexpected_attrs('l1_normalization', kwargs)
 
     sigma = sum_reduce_converter(abs_converter(data), axes, False)
-    return div_converter(data, max_converter(add_converter(sigma, _expr.const(bias)),
+    return div_converter(data, max_converter(add_converter(sigma, tmv_expr.const(bias)),
                                              epsilon))
 
 
@@ -1769,7 +1775,7 @@ class NNEF_Converter:
         self._construct_nodes(graph)
 
         outputs = [self._nodes[n] for n in graph.outputs]
-        outputs = outputs[0] if len(outputs) == 1 else _expr.Tuple(outputs)
+        outputs = outputs[0] if len(outputs) == 1 else tmv_expr.Tuple(outputs)
 
         nodes = {v: k for k, v in self._nodes.items()}
         free_vars = analysis.free_vars(outputs)
@@ -1782,15 +1788,15 @@ class NNEF_Converter:
 
     def _parse_inputs(self, graph: nnef.Graph):
         for inp in graph.inputs:
-            if inp in self._params:
-                self._num_params += 1
-                self._nodes[inp] = new_var(inp, shape=self._params[inp].shape, dtype=self._params[inp].dtype)
-            elif inp in self._nodes:
-                continue
-            else:
-                self._num_inputs += 1
-                i_tens = graph.tensors[inp]
-                self._nodes[inp] = new_var(inp, shape=i_tens.shape, dtype=get_type(i_tens.dtype))
+            # if inp in self._params:
+            #     self._num_params += 1
+            #     self._nodes[inp] = new_var(inp, shape=self._params[inp].shape, dtype=self._params[inp].dtype)
+            # elif inp in self._nodes:
+            #     continue
+            # else:
+            self._num_inputs += 1
+            i_tens = graph.tensors[inp]
+            self._nodes[inp] = new_var(inp, shape=i_tens.shape, dtype=get_type(i_tens.dtype))
             self._inputs[inp] = self._nodes[inp]
 
     def _construct_nodes(self, graph):
@@ -1837,18 +1843,18 @@ class NNEF_Converter:
 
                 converted = self._get_relay_op_call(op.name, inputs, op.attribs)
 
-                if not isinstance(converted, _expr.TupleWrapper):
+                if not isinstance(converted, tmv_expr.TupleWrapper):
                     outputs_num = 1
                 else:
                     outputs_num = len(converted)
 
                 if outputs_num == 1:
-                    if not isinstance(converted, _expr.TupleWrapper):
+                    if not isinstance(converted, tmv_expr.TupleWrapper):
                         converted = fold_constant(converted)
                     else:
                         converted = fold_constant(converted.astuple())
                 else:
-                    converted = _expr.TupleWrapper(fold_constant(converted.astuple()), len(converted))
+                    converted = tmv_expr.TupleWrapper(fold_constant(converted.astuple()), len(converted))
 
                 converted = set_span(converted, op.name)
 
@@ -1867,11 +1873,11 @@ class NNEF_Converter:
         name = node.outputs['output']
         data = node.attribs['value']
         shape = node.attribs['shape']
-        if shape != [1]:
+        if len(data) == 1:
             data = np.full(shape, data, dtype=get_type(node.dtype))
         else:
             data = np.array(data, dtype=get_type(node.dtype))
-        self._consts[name] = _expr.const(data)
+        self._consts[name] = tmv_expr.const(data)
         self._nodes[name] = self._consts[name]
 
     def _set_literal_inputs(self, node):
@@ -1879,7 +1885,7 @@ class NNEF_Converter:
             if isinstance(v, list):
                 for ve in v:
                     if ve not in self._nodes.keys():
-                        self._nodes[f'{node.name}_{k}'] = _expr.const(np.array(ve, dtype=get_type(node.dtype)))
+                        self._nodes[f'{node.name}_{k}'] = tmv_expr.const(np.array(ve, dtype=get_type(node.dtype)))
 
             else:
                 if v not in self._nodes.keys():
@@ -1887,7 +1893,7 @@ class NNEF_Converter:
                         dtype = get_type(node.dtype)
                     else:
                         dtype = infer_type(v)
-                    self._nodes[f'{node.name}_{k}'] = _expr.const(np.array(v, dtype=dtype))
+                    self._nodes[f'{node.name}_{k}'] = tmv_expr.const(np.array(v, dtype=dtype))
 
     def _set_parameter_span(self, node, node_source_name):
         for k, name in node.inputs.items():
@@ -1899,15 +1905,17 @@ class NNEF_Converter:
 
     def _set_par_span_helper(self, node, node_source_name, name):
         expr = self._nodes.get(name)
-        if isinstance(expr, (relay.Var, relay.Constant)):
-            if isinstance(expr, relay.Constant):
-                if name not in self._consts:
-                    name = f'{node.name}_const'
 
+        if isinstance(expr, relay.Constant):
+            if name not in self._consts:
+                name = f'{node.name}_const'
+        if isinstance(expr, relay.Var):
             expr_with_span = set_span(expr, make_parameter_span([node_source_name, name]))
             self._nodes[name] = expr_with_span
             if name in self._inputs:
                 self._inputs[name] = expr_with_span
+
+        raise InterpretationError(f'Failed to interpret {name}, while setting the span for {node_source_name}')
 
     def _get_relay_op_call(self, name, inputs, attrs):
         conv_map = _get_converter_map()

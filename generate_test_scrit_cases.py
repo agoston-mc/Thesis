@@ -13,17 +13,7 @@ usage:
 script = """
 @tvm.testing.parametrize_targets
 def test_{case}(target, dev):
-    case_path = '{case_path}'
-    atol = 1e-5
-    rtol = 1e-5
-    graph = nnef.load_graph(case_path) 
-    inputs = {{}}
-    outputs = {{}}
-    for inp in graph.inputs:
-        inputs[inp] = _read_tensor(os.path.join(case_path, f'{{inp}}.dat'))
-    for out in graph.outputs:
-        outputs[out] = _read_tensor(os.path.join(case_path, f'{{out}}.dat'))
-    verify_model(case_path, inputs, outputs, target, dev, rtol, atol)
+    verify_model('{case}', inputs, outputs, target, dev, rtol, atol)
 """
 
 pwd = os.getcwd()
