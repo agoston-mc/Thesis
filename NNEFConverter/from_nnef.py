@@ -1026,7 +1026,8 @@ def nearest_upsample_converter(data,
         data,
         new_size,
         method='nearest_neighbor',
-        coordinate_transformation_mode='asymmetric'
+        # coordinate_transformation_mode='asymmetric',
+        rounding_method='round',
     )
 
 
