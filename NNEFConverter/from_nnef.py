@@ -1,7 +1,7 @@
 import os
 import nnef
-from nnef_ops import _get_converter_map
-from nnef_ops import *
+from .nnef_ops import _get_converter_map
+from .nnef_ops import *
 
 from tvm.ir import IRModule
 from tvm.relay import analysis, function
@@ -156,13 +156,13 @@ class NNEF_Converter:
         if isinstance(expr, relay.Constant):
             if name not in self._consts:
                 name = f'{node.name}_const'
-        if isinstance(expr, relay.Var):
-            expr_with_span = set_span(expr, make_parameter_span([node_source_name, name]))
-            self._nodes[name] = expr_with_span
-            if name in self._inputs:
-                self._inputs[name] = expr_with_span
+        expr_with_span = set_span(expr, make_parameter_span([node_source_name, name]))
+        self._nodes[name] = expr_with_span
+        if name in self._inputs:
+            self._inputs[name] = expr_with_span
 
-        raise TypeError(f'Failed to interpret {name}, while setting the span for {node_source_name}')
+        # if not isinstance(expr, relay.expr.RelayExpr):
+        #     raise TypeError(f'Failed to interpret {name}, while setting the span for {node_source_name}')
 
     def _get_relay_op_call(self, name, inputs, attrs):
         conv_map = _get_converter_map()
