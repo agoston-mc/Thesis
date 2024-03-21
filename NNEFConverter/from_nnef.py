@@ -149,26 +149,28 @@ class NNEF_Converter:
         for k, v in node.inputs.items():
             if isinstance(v, list):
                 for ve in v:
-                    if ve not in self._nodes.keys():
+                    dtype, is_literal = self._infer_type(ve)
+                    if is_literal:
                         self._nodes[f'{node.name}_{k}'] = tmv_expr.const(np.array(ve, dtype=get_type(node.dtype)))
 
             else:
-                if v not in self._nodes.keys():
-                    if node.dtype:
-                        dtype = get_type(node.dtype)
-                    else:
-                        dtype = infer_type(v)
+                dtype, is_literal = self._infer_type(v)
+                if is_literal:
                     self._nodes[f'{node.name}_{k}'] = tmv_expr.const(np.array(v, dtype=dtype))
 
     def _set_parameter_span(self, node, node_source_name):
         for k, name in node.inputs.items():
             if isinstance(name, list):
                 for n in name:
-                    self._set_par_span_helper(node, node_source_name, n)
+                    self._set_par_span_helper(node, node_source_name, n, k)
             else:
-                self._set_par_span_helper(node, node_source_name, name)
+                self._set_par_span_helper(node, node_source_name, name, k)
 
-    def _set_par_span_helper(self, node, node_source_name, name):
+    def _set_par_span_helper(self, node, node_source_name, name, field_name):
+        _, islit = self._infer_type(name)
+        if islit:
+            name = f'{node.name}_{field_name}'
+
         expr = self._nodes.get(name)
 
         if isinstance(expr, relay.Constant):
