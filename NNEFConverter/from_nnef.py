@@ -8,6 +8,24 @@ from tvm.relay import analysis, function
 from tvm.relay.frontend.common import new_var, fold_constant, set_span
 
 
+def get_type(elem_type):
+    """
+    Gives numpy style type for nnef primitive types, uses x32 versions.
+
+    :param elem_type: string, (scalar, integer, logical, string)
+    :return: returns numpy dtype equivalent (float32, int32, bool, string)
+    """
+    if elem_type == 'scalar':
+        return 'float32'
+    if elem_type == 'integer':
+        return 'int32'
+    if elem_type == 'logical':
+        return 'bool'
+    if elem_type == 'string':
+        return 'string'
+    raise TypeError(f'Type \'{elem_type}\' is not implemented')
+
+
 # Converter class
 class NNEF_Converter:
 
@@ -171,6 +189,20 @@ class NNEF_Converter:
         else:
             raise NotImplementedError(f'Operator {name} is not implemented.')
         return call
+
+    def _infer_type(self, val):
+        if isinstance(val, bool):
+            return 'bool', True
+        if isinstance(val, float):
+            return 'float32', True
+        if isinstance(val, int):
+            return 'int32', True
+        if isinstance(val, str):
+            if val in self._nodes.keys():
+                return self._nodes[val].type_annotation.dtype, False
+            return 'string', True
+
+        raise TypeError(f'Value \'{val}\' is not a recognized type')
 
 
 def from_nnef(

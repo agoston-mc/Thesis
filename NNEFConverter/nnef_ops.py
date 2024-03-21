@@ -15,35 +15,6 @@ from tvm.relay.frontend.common import get_relay_op, infer_shape
 
 # Base methods
 
-def get_type(elem_type):
-    """
-    Gives numpy style type for nnef primitive types, uses x32 versions.
-
-    :param elem_type: string, (scalar, integer, logical, string)
-    :return: returns numpy dtype equivalent (float32, int32, bool, string)
-    """
-    if elem_type == 'scalar':
-        return 'float32'
-    if elem_type == 'integer':
-        return 'int32'
-    if elem_type == 'logical':
-        return 'bool'
-    if elem_type == 'string':
-        return 'string'
-    raise TypeError(f'Type \'{elem_type}\' is not implemented')
-
-
-def infer_type(val):
-    if isinstance(val, bool):
-        return 'bool'
-    if isinstance(val, float):
-        return 'float32'
-    if isinstance(val, int):
-        return 'int32'
-    if isinstance(val, str):
-        return 'string'
-    raise TypeError(f'Value \'{val}\' is not a recognized type')
-
 
 def dimension_picker(prefix, kernel_shape, suffix=''):
     """
