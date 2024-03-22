@@ -155,8 +155,12 @@ def _padding_conv(padding, rank, keepdims=False):
 
 def _calculate_nnef_padding(active_shape, strides, kernel_shape, dilation):
     # ordering of nnef autopad and tvm autopad sometimes is different, implementing nnef style padding calculation
+    # active_shape is the data dimensions
+    # strides is the strides over the active dimensions
+    # kernel_shape is the shape of the window, must have the same rank as active shape
+    # dilation is the dilations over the active dimensions
     output = [(ui + (s - 1)) // s for ui, s in zip(active_shape, strides)]
-    dilated = [(f - 1) * d + 1 for f, d in zip(kernel_shape[2:], dilation)]
+    dilated = [(f - 1) * d + 1 for f, d in zip(kernel_shape, dilation)]
     total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, strides, dilated, active_shape)]
     padding = [(pad // 2, (pad + 1) // 2) for pad in total]
     return padding
@@ -718,7 +722,7 @@ def conv_converter(data,
             (1,) * (len(kernel_shape) - 2))
 
     if not padding:
-        padding = _calculate_nnef_padding(dshape[2:], strides, kernel_shape, dilation)
+        padding = _calculate_nnef_padding(dshape[2:], strides, kernel_shape[2:], dilation)
 
     pad = _padding_conv(padding, len(kernel_shape))
 
@@ -1057,13 +1061,12 @@ def multilinear_upsample_converter(data,
         else:
             padding = [f // 2 for f in factor]
 
-        padding = factor if replicate else [f // 2 for f in factor]
         return deconv_converter(data,
                                 kernel,
                                 tvm_expr.const(0.0),
                                 border='constant',
                                 stride=factor,
-                                padding=[(p, p) for p in padding],
+                                padding=[(p, p-1) for p in padding],
                                 dilation=[],
                                 groups=c,
                                 output_shape=output_shape,
