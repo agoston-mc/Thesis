@@ -8,7 +8,7 @@ import numpy as np
 import tvm
 from tvm import relay
 
-from tvm.relay import expr as tmv_expr
+from tvm.relay import expr as tvm_expr
 from tvm.relay import op as _op
 from tvm.relay.frontend.common import get_relay_op, infer_shape
 
@@ -342,7 +342,7 @@ def rcp_converter(data,
     if kwargs:
         __unexpected_attrs('rcp', kwargs)
 
-    return div_converter(tmv_expr.const(1, dtype=data.type_annotation.dtype), data)
+    return div_converter(tvm_expr.const(1, dtype=data.type_annotation.dtype), data)
 
 
 def exp_converter(data,
@@ -628,7 +628,7 @@ def sqr_converter(data,
     if kwargs:
         __unexpected_attrs('sqr', kwargs)
 
-    return get_relay_op('power')(data, tmv_expr.const(2.0, dtype=data.type_annotation.dtype))
+    return get_relay_op('power')(data, tvm_expr.const(2.0, dtype=data.type_annotation.dtype))
 
 
 def sqrt_converter(data,
@@ -644,7 +644,7 @@ def rsqr_converter(data,
     if kwargs:
         __unexpected_attrs('rsqr', kwargs)
 
-    return get_relay_op('power')(data, tmv_expr.const(-2.0, dtype=data.type_annotation.dtype))
+    return get_relay_op('power')(data, tvm_expr.const(-2.0, dtype=data.type_annotation.dtype))
 
 
 def rsqrt_converter(data,
@@ -740,7 +740,7 @@ def conv_converter(data,
     )
 
     res = None
-    if isinstance(bias, tmv_expr.Constant):
+    if isinstance(bias, tvm_expr.Constant):
         # nnef has bias of 0 if it is not needed
         if (bias.data.numpy() == 0).all():
             res = conv_out
@@ -808,7 +808,7 @@ def deconv_converter(data,
     )
 
     res = None
-    if isinstance(bias, tmv_expr.Constant):
+    if isinstance(bias, tvm_expr.Constant):
         if bias.data.numpy() == np.array([0.0]):
             res = deconv_out
 
@@ -840,7 +840,7 @@ def box_converter(data,
         kernel = relay.ones(size, d_type)
     out = conv_converter(data,
                          kernel,
-                         tmv_expr.const(0, dtype=data.type_annotation.dtype),
+                         tvm_expr.const(0, dtype=data.type_annotation.dtype),
                          border,
                          stride,
                          padding,
@@ -910,7 +910,7 @@ def debox_converter(data,
         kernel = relay.ones(size, d_type)
     out = deconv_converter(data,
                            kernel,
-                           tmv_expr.const(0, dtype=data.type_annotation.dtype),
+                           tvm_expr.const(0, dtype=data.type_annotation.dtype),
                            border,
                            stride,
                            padding,
@@ -1033,7 +1033,7 @@ def multilinear_upsample_converter(data,
     symmetric = method == 'symmetric'
     weights = _upsample_weights_nd(factor, symmetric)
     weights = np.reshape(weights, newshape=(1, 1) + weights.shape)
-    kernel = tile_converter(tmv_expr.const(weights), (c, 1) + (1,) * len(factor))
+    kernel = tile_converter(tvm_expr.const(weights), (c, 1) + (1,) * len(factor))
     # np.tile(np.reshape(weights, newshape=(1, 1) + weights.shape), reps=(c, 1) + (1,) * len(factor))
 
     output_shape = [n, c] + [f * s for f, s in zip(factor, dshape[2:])]
@@ -1041,7 +1041,7 @@ def multilinear_upsample_converter(data,
     if symmetric:
         return deconv_converter(data,
                                 kernel,
-                                tmv_expr.const(0.0),
+                                tvm_expr.const(0.0),
                                 border='constant',
                                 stride=factor,
                                 padding=[(f - 1, f - 1) for f in factor],
@@ -1052,13 +1052,15 @@ def multilinear_upsample_converter(data,
     else:
         replicate = border == 'replicate'
         if replicate:
-            data = pad_converter(data, [(0, 0), (0, 0)] + [(1, 0)] * len(factor), border, tmv_expr.const(0.0))
-            # nnef_pad(input, padding=[(0, 0), (0, 0)] + [(1, 0)] * rank, border=border)
+            data = pad_converter(data, [(0, 0), (0, 0)] + [(1, 0)] * len(factor), border, tvm_expr.const(0.0))
+            padding = factor
+        else:
+            padding = [f // 2 for f in factor]
 
         padding = factor if replicate else [f // 2 for f in factor]
         return deconv_converter(data,
                                 kernel,
-                                tmv_expr.const(0.0),
+                                tvm_expr.const(0.0),
                                 border='constant',
                                 stride=factor,
                                 padding=[(p, p) for p in padding],
@@ -1191,7 +1193,7 @@ def unsqueeze_converter(data,
 
     axes = sorted(axes)
     for axis in axes:
-        if axis < 0 and isinstance(data, tmv_expr.Var):
+        if axis < 0 and isinstance(data, tvm_expr.Var):
             axis = len(data.type_annotation.concrete_shape) + len(axes) + axis
 
         data = _op.expand_dims(data, axis=axis, num_newaxis=1)
@@ -1262,7 +1264,7 @@ def unstack_converter(data,
     res = []
     for i in range(len(split)):
         res.append(squeeze_converter(split[i], axis))
-    return tmv_expr.TupleWrapper(relay.Tuple(res), len(res))
+    return tvm_expr.TupleWrapper(relay.Tuple(res), len(res))
 
 
 # todo test
@@ -1375,9 +1377,9 @@ def elu_converter(data,
     if kwargs:
         __unexpected_attrs('elu', kwargs)
 
-    return select_converter(lt_converter(data, tmv_expr.const(0.0)),
-                            mul_converter(tmv_expr.const(alpha),
-                                          sub_converter(exp_converter(data), tmv_expr.const(1.0))),
+    return select_converter(lt_converter(data, tvm_expr.const(0.0)),
+                            mul_converter(tvm_expr.const(alpha),
+                                          sub_converter(exp_converter(data), tvm_expr.const(1.0))),
                             data)
 
 
@@ -1388,10 +1390,10 @@ def selu_converter(data,
     if kwargs:
         __unexpected_attrs('selu', kwargs)
 
-    return mul_converter(tmv_expr.const(lambda_var),
-                         select_converter(data < tmv_expr.const(0.0),
-                                          mul_converter(tmv_expr.const(alpha),
-                                                        sub_converter(exp_converter(data), tmv_expr.const(1.0))),
+    return mul_converter(tvm_expr.const(lambda_var),
+                         select_converter(data < tvm_expr.const(0.0),
+                                          mul_converter(tvm_expr.const(alpha),
+                                                        sub_converter(exp_converter(data), tvm_expr.const(1.0))),
                                           data))
 
 
@@ -1405,7 +1407,7 @@ def gelu_converter(data,
     # CDF of the standard normal distribution, which can be approximated
     # for example by sigmoid(1.702 * x)
 
-    return mul_converter(data, sigmoid_converter(mul_converter(tmv_expr.const(1.702), data)))
+    return mul_converter(data, sigmoid_converter(mul_converter(tvm_expr.const(1.702), data)))
 
 
 def silu_converter(data,
@@ -1434,7 +1436,7 @@ def softplus_converter(data,
     if kwargs:
         __unexpected_attrs('softplus', kwargs)
 
-    return log_converter(add_converter(exp_converter(data), tmv_expr.const(1.0)))
+    return log_converter(add_converter(exp_converter(data), tvm_expr.const(1.0)))
 
 
 #   # linear ops
@@ -1449,7 +1451,7 @@ def linear_converter(data,
     out = get_relay_op('matmul')(data, filter, transpose_b=True)
     res = None
 
-    if isinstance(bias, tmv_expr.Constant):
+    if isinstance(bias, tvm_expr.Constant):
         if (bias.data.numpy() == 0).all():
             res = out
 
@@ -1533,7 +1535,7 @@ def max_pool_converter(data,
 
     if border == 'constant':
         padding = [(0, 0), (0, 0)] + padding
-        data = pad_converter(data, padding, border, tmv_expr.const(0.0))
+        data = pad_converter(data, padding, border, tvm_expr.const(0.0))
         pad = (0, 0)
 
     op = get_relay_op(dimension_picker('max_pool', dshape))
@@ -1647,7 +1649,7 @@ def local_variance_normalization_converter(data,
 
     sigma = box_converter(sqr_converter(data), size, 'constant', [], [], [], normalize=True)
     return div_converter(data,
-                         max_converter(add_converter(sqrt_converter(sigma), tmv_expr.const(bias)),
+                         max_converter(add_converter(sqrt_converter(sigma), tvm_expr.const(bias)),
                                        epsilon))
 
 
@@ -1672,7 +1674,7 @@ def l1_normalization_converter(data,
         __unexpected_attrs('l1_normalization', kwargs)
 
     sigma = sum_reduce_converter(abs_converter(data), axes, False)
-    return div_converter(data, max_converter(add_converter(sigma, tmv_expr.const(bias)),
+    return div_converter(data, max_converter(add_converter(sigma, tvm_expr.const(bias)),
                                              epsilon))
 
 

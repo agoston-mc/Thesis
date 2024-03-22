@@ -43,7 +43,7 @@ class NNEF_Converter:
         self._construct_nodes(graph)
 
         outputs = [self._nodes[n] for n in graph.outputs]
-        outputs = outputs[0] if len(outputs) == 1 else tmv_expr.Tuple(outputs)
+        outputs = outputs[0] if len(outputs) == 1 else tvm_expr.Tuple(outputs)
 
         nodes = {v: k for k, v in self._nodes.items()}
         free_vars = analysis.free_vars(outputs)
@@ -70,7 +70,7 @@ class NNEF_Converter:
                 tensor = graph.tensors[op.outputs['output']]
                 tens_data = tensor.data
                 if self._freeze_vars:
-                    self._consts[tensor.name] = tmv_expr.const(tens_data)
+                    self._consts[tensor.name] = tvm_expr.const(tens_data)
                     self._nodes[tensor.name] = self._consts[tensor.name]
                 else:
                     self._nodes[tensor.name] = new_var(tensor.name, shape=op.attribs['shape'],
@@ -108,18 +108,18 @@ class NNEF_Converter:
 
                 converted = self._get_relay_op_call(op.name, inputs, op.attribs)
 
-                if not isinstance(converted, tmv_expr.TupleWrapper):
+                if not isinstance(converted, tvm_expr.TupleWrapper):
                     outputs_num = 1
                 else:
                     outputs_num = len(converted)
 
                 if outputs_num == 1:
-                    if not isinstance(converted, tmv_expr.TupleWrapper):
+                    if not isinstance(converted, tvm_expr.TupleWrapper):
                         converted = fold_constant(converted)
                     else:
                         converted = fold_constant(converted.astuple())
                 else:
-                    converted = tmv_expr.TupleWrapper(fold_constant(converted.astuple()), len(converted))
+                    converted = tvm_expr.TupleWrapper(fold_constant(converted.astuple()), len(converted))
 
                 converted = set_span(converted, op.name)
 
@@ -142,7 +142,7 @@ class NNEF_Converter:
             data = np.full(shape, data, dtype=get_type(node.dtype))
         else:
             data = np.array(data, dtype=get_type(node.dtype))
-        self._consts[name] = tmv_expr.const(data)
+        self._consts[name] = tvm_expr.const(data)
         self._nodes[name] = self._consts[name]
 
     def _set_literal_inputs(self, node):
@@ -151,12 +151,12 @@ class NNEF_Converter:
                 for ve in v:
                     dtype, is_literal = self._infer_type(ve)
                     if is_literal:
-                        self._nodes[f'{node.name}_{k}'] = tmv_expr.const(np.array(ve, dtype=get_type(node.dtype)))
+                        self._nodes[f'{node.name}_{k}'] = tvm_expr.const(np.array(ve, dtype=get_type(node.dtype)))
 
             else:
                 dtype, is_literal = self._infer_type(v)
                 if is_literal:
-                    self._nodes[f'{node.name}_{k}'] = tmv_expr.const(np.array(v, dtype=dtype))
+                    self._nodes[f'{node.name}_{k}'] = tvm_expr.const(np.array(v, dtype=dtype))
 
     def _set_parameter_span(self, node, node_source_name):
         for k, name in node.inputs.items():
