@@ -5,7 +5,7 @@ from .nnef_ops import *
 
 from tvm.ir import IRModule
 from tvm.relay import analysis, function
-from tvm.relay.frontend.common import new_var, fold_constant, set_span
+from tvm.relay.frontend.common import new_var, fold_constant, set_span, infer_type
 
 
 def get_type(elem_type):
@@ -201,7 +201,14 @@ class NNEF_Converter:
             return 'int32', True
         if isinstance(val, str):
             if val in self._nodes.keys():
-                return self._nodes[val].type_annotation.dtype, False
+                node = self._nodes[val]
+                if isinstance(node, tvm_expr.Var):
+                    return node.type_annotation.dtype, False
+                if isinstance(node, tvm_expr.Constant):
+                    return node.data.dtype, False
+                if isinstance(node, tvm_expr.Call):
+                    type = infer_type(node)
+                    return type.checked_type.dtype, False
             return 'string', True
 
         raise TypeError(f'Value \'{val}\' is not a recognized type')
