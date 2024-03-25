@@ -207,8 +207,7 @@ class NNEF_Converter:
                 if isinstance(node, tvm_expr.Constant):
                     return node.data.dtype, False
                 if isinstance(node, tvm_expr.Call):
-                    type = infer_type(node)
-                    return type.checked_type.dtype, False
+                    return infer_type(node).checked_type.dtype, False
             return 'string', True
 
         raise TypeError(f'Value \'{val}\' is not a recognized type')
