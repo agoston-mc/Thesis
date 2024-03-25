@@ -57,8 +57,8 @@ class NNEF_Converter:
     def _parse_inputs(self, graph: nnef.Graph):
         for inp in graph.inputs:
             self._num_inputs += 1
-            i_tens = graph.tensors[inp]
-            self._nodes[inp] = new_var(inp, shape=i_tens.shape, dtype=get_type(i_tens.dtype))
+            tensor = graph.tensors[inp]
+            self._nodes[inp] = new_var(inp, shape=tensor.shape, dtype=get_type(tensor.dtype))
             self._inputs[inp] = self._nodes[inp]
 
     def _construct_nodes(self, graph):
@@ -67,15 +67,7 @@ class NNEF_Converter:
                 continue
 
             if op.name == 'variable':
-                tensor = graph.tensors[op.outputs['output']]
-                tens_data = tensor.data
-                if self._freeze_vars:
-                    self._consts[tensor.name] = tvm_expr.const(tens_data)
-                    self._nodes[tensor.name] = self._consts[tensor.name]
-                else:
-                    self._nodes[tensor.name] = new_var(tensor.name, shape=op.attribs['shape'],
-                                                       dtype=get_type(tensor.dtype))
-                    self._params[tensor.name] = tens_data
+                self._set_variable(graph.tensors[op.outputs['output']])
 
             elif op.name == 'constant':
                 self._set_const(op)
@@ -145,18 +137,28 @@ class NNEF_Converter:
         self._consts[name] = tvm_expr.const(data)
         self._nodes[name] = self._consts[name]
 
+    def _set_variable(self, tensor):
+        tens_data = tensor.data
+        if self._freeze_vars:
+            self._consts[tensor.name] = tvm_expr.const(tens_data)
+            self._nodes[tensor.name] = self._consts[tensor.name]
+        else:
+            self._nodes[tensor.name] = new_var(tensor.name, shape=tensor.shape,
+                                               dtype=get_type(tensor.dtype))
+            self._params[tensor.name] = tens_data
+
     def _set_literal_inputs(self, node):
-        for k, v in node.inputs.items():
-            if isinstance(v, list):
-                for ve in v:
-                    dtype, is_literal = self._infer_type(ve)
+        for field_name, value in node.inputs.items():
+            if isinstance(value, list):
+                for v in value:
+                    dtype, is_literal = self._infer_type(v)
                     if is_literal:
-                        self._nodes[f'{node.name}_{k}'] = tvm_expr.const(np.array(ve, dtype=get_type(node.dtype)))
+                        self._nodes[f'{node.name}_{v}'] = tvm_expr.const(np.array(v, dtype=get_type(node.dtype)))
 
             else:
-                dtype, is_literal = self._infer_type(v)
+                dtype, is_literal = self._infer_type(value)
                 if is_literal:
-                    self._nodes[f'{node.name}_{k}'] = tvm_expr.const(np.array(v, dtype=dtype))
+                    self._nodes[f'{node.name}_{field_name}'] = tvm_expr.const(np.array(value, dtype=dtype))
 
     def _set_parameter_span(self, node, node_source_name):
         for field_name, name in node.inputs.items():
