@@ -159,16 +159,16 @@ class NNEF_Converter:
                     self._nodes[f'{node.name}_{k}'] = tvm_expr.const(np.array(v, dtype=dtype))
 
     def _set_parameter_span(self, node, node_source_name):
-        for k, name in node.inputs.items():
+        for field_name, name in node.inputs.items():
             if isinstance(name, list):
                 for n in name:
-                    self._set_par_span_helper(node, node_source_name, n, k)
+                    self._set_par_span_helper(node, node_source_name, n, field_name)
             else:
-                self._set_par_span_helper(node, node_source_name, name, k)
+                self._set_par_span_helper(node, node_source_name, name, field_name)
 
     def _set_par_span_helper(self, node, node_source_name, name, field_name):
-        _, islit = self._infer_type(name)
-        if islit:
+        _, is_literal = self._infer_type(name)
+        if is_literal:
             name = f'{node.name}_{field_name}'
 
         expr = self._nodes.get(name)
@@ -189,7 +189,8 @@ class NNEF_Converter:
         if name in conv_map:
             call = conv_map[name](*inputs, **attrs)
         else:
-            raise NotImplementedError(f'Operator {name} is not implemented.')
+            # This error is reached if NNEF is expanded with additional ops
+            raise NotImplementedError(f'Operator {name} is not implemented, as {name} has been added after 1.0.5.')
         return call
 
     def _infer_type(self, val):
@@ -200,14 +201,17 @@ class NNEF_Converter:
         if isinstance(val, int):
             return 'int32', True
         if isinstance(val, str):
-            if val in self._nodes.keys():
-                node = self._nodes[val]
-                if isinstance(node, tvm_expr.Var):
-                    return node.type_annotation.dtype, False
-                if isinstance(node, tvm_expr.Constant):
-                    return node.data.dtype, False
-                if isinstance(node, tvm_expr.Call):
-                    return infer_type(node).checked_type.dtype, False
+            # the string val's can be names of nodes in some of the cases
+            if isinstance(val, nnef.Identifier):
+                if val in self._nodes.keys():
+                    node = self._nodes[val]
+                    if isinstance(node, tvm_expr.Var):
+                        return node.type_annotation.dtype, False
+                    if isinstance(node, tvm_expr.Constant):
+                        return node.data.dtype, False
+                    if isinstance(node, tvm_expr.Call):
+                        return infer_type(node).checked_type.dtype, False
+                raise Exception(f'{val} has not been loaded into the model but it should have been, as a var or call.')
             return 'string', True
 
         raise TypeError(f'Value \'{val}\' is not a recognized type')
@@ -218,9 +222,31 @@ def from_nnef(
         freeze_vars=False
 ):
     """
-    :return: (mod, params) : (tvm.IRModule, dict of str and tvm.nd.NDArray)
+    Convert an NNEF model into an equivalent TVM Relay IRModule.
+
+
+    Parameters
+    ----------
+    model_path : str or os.PathLike
+        path to an NNEF model directory, containing the graph.nnef (and weight files)
+
+    freeze_vars : bool, optional
+        If this parameter is true, the nnef variables will be converted to
+        constants, and be embedded into the relay model, allowing optimizations
+        at compile time.
+
+    Returns
+    -------
+    mod : tvm.IRModule
+        the relay module for compilation
+
+    params : dict of str to tvm.nd.NDArray
+        The parameter dictionary to be used
     """
-    par = NNEF_Converter(freeze_vars)
+    conv_clss = NNEF_Converter(freeze_vars)
     model = nnef.load_graph(model_path)
+
+    # fills in the nnef graph's shape information
     nnef.infer_shapes(model)
-    return par.from_nnef(graph=model)
+
+    return conv_clss.from_nnef(graph=model)
