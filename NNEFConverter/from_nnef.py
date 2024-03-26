@@ -1,14 +1,19 @@
 import os
 import nnef
-from .nnef_ops import _get_converter_map
-from .nnef_ops import *
+import tvm
 
+import numpy as np
+
+from .nnef_ops import _get_converter_map
+
+from tvm import relay
 from tvm.ir import IRModule
+from tvm.relay import expr as tvm_expr
 from tvm.relay import analysis, function
 from tvm.relay.frontend.common import new_var, fold_constant, set_span, infer_type
 
 
-def get_type(elem_type):
+def get_type(elem_type: str):
     """
     Gives numpy style type for nnef primitive types, uses x32 versions.
 
@@ -26,10 +31,27 @@ def get_type(elem_type):
     raise TypeError(f'Type \'{elem_type}\' is not implemented')
 
 
+def make_parameter_span(source_name_list, name_sep="."):
+    return name_sep.join(source_name_list)
+
+
 # Converter class
 class NNEF_Converter:
+    """
+    Helper class for class level attributes, for conversion of NNEF model.
+    Public method to use is from_nnef.
 
-    def __init__(self, freeze_vars):
+    Parameters
+    ----------
+
+    freeze_vars : bool, optional
+        If this parameter is true, the nnef variables will be converted to
+        constants, and be embedded into the relay model, allowing optimizations
+        at compile time.
+
+    """
+
+    def __init__(self, freeze_vars=False):
         self._nodes = {}
         self._consts = {}
         self._inputs = {}
@@ -38,7 +60,25 @@ class NNEF_Converter:
         self._num_params = 0
         self._freeze_vars = freeze_vars
 
-    def from_nnef(self, graph):
+    def from_nnef(self, graph: nnef.Graph) -> tuple[tvm.IRModule, dict]:
+        """
+        Convert an NNEF model into an equivalent TVM Relay IRModule.
+
+        Parameters
+        ----------
+        graph : nnef.Graph
+            An NNEF Graph object that was imported with nnef.load_graph.
+            Shapes should be inferred by nnef.infer_shapes on graph beforehand.
+
+        Returns
+        -------
+        mod : tvm.IRModule
+            The relay module for compilation
+
+        params : dict of str to tvm.nd.NDArray
+            The parameter dictionary to be used
+
+        """
         self._parse_inputs(graph)
         self._construct_nodes(graph)
 
@@ -54,7 +94,8 @@ class NNEF_Converter:
         func = function.Function(list(self._inputs.values()), outputs)
         return IRModule.from_expr(func), self._params
 
-    def _parse_inputs(self, graph: nnef.Graph):
+    def _parse_inputs(self, graph):
+        """Save inputs into class from inputs attrib of graph"""
         for inp in graph.inputs:
             self._num_inputs += 1
             tensor = graph.tensors[inp]
@@ -187,6 +228,7 @@ class NNEF_Converter:
         #     raise TypeError(f'Failed to interpret {name}, while setting the span for {node_source_name}')
 
     def _get_relay_op_call(self, name, inputs, attrs):
+        """Returns the tvm.Call equivalent to the nnef operator"""
         conv_map = _get_converter_map()
         if name in conv_map:
             call = conv_map[name](*inputs, **attrs)
@@ -221,8 +263,8 @@ class NNEF_Converter:
 
 def from_nnef(
         model_path: os.PathLike | str,
-        freeze_vars=False
-):
+        freeze_vars: bool = False,
+) -> tuple[IRModule, dict]:
     """
     Convert an NNEF model into an equivalent TVM Relay IRModule.
 
@@ -230,7 +272,7 @@ def from_nnef(
     Parameters
     ----------
     model_path : str or os.PathLike
-        path to an NNEF model directory, containing the graph.nnef (and weight files)
+        Path to an NNEF model directory, containing the graph.nnef (and weight files)
 
     freeze_vars : bool, optional
         If this parameter is true, the nnef variables will be converted to
@@ -240,7 +282,7 @@ def from_nnef(
     Returns
     -------
     mod : tvm.IRModule
-        the relay module for compilation
+        The relay module for compilation
 
     params : dict of str to tvm.nd.NDArray
         The parameter dictionary to be used

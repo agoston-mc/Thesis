@@ -9,7 +9,7 @@ import tvm
 from tvm import relay
 
 from tvm.relay import expr as tvm_expr
-from tvm.relay import op as _op
+from tvm.relay import op as tvm_op
 from tvm.relay.frontend.common import get_relay_op, infer_shape
 
 
@@ -172,10 +172,6 @@ def _calculate_nnef_padding_deconv(data_sh, strides, kernel_active_sh, dilation,
     total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in
              zip(data_sh, strides, dilated, out_sh)]
     return total, out_sh
-
-
-def make_parameter_span(source_name_list, name_sep="."):
-    return name_sep.join(source_name_list)
 
 
 def __unexpected_attrs(op, kwargs):
@@ -751,7 +747,7 @@ def conv_converter(data,
 
     if not res:
         # squeeze needed as nnef has bias of shape [1, channel]
-        res = _op.nn.bias_add(conv_out, relay.squeeze(bias, axis=0))
+        res = tvm_op.nn.bias_add(conv_out, relay.squeeze(bias, axis=0))
 
     return res
 
@@ -818,7 +814,7 @@ def deconv_converter(data,
 
     if not res:
         # squeeze needed bc nnef has bias of shape [1, channel]
-        res = _op.nn.bias_add(deconv_out, relay.squeeze(bias, axis=0))
+        res = tvm_op.nn.bias_add(deconv_out, relay.squeeze(bias, axis=0))
 
     return res
 
@@ -839,7 +835,7 @@ def box_converter(data,
     d_type = data.type_annotation.dtype
     size[0] = dshape[1]
     if normalize:
-        kernel = relay.full(_op.const(1 / math.prod(size[2:]), d_type), size, d_type)
+        kernel = relay.full(tvm_op.const(1 / math.prod(size[2:]), d_type), size, d_type)
     else:
         kernel = relay.ones(size, d_type)
     out = conv_converter(data,
@@ -909,7 +905,7 @@ def debox_converter(data,
     d_type = data.type_annotation.dtype
     size[0] = dshape[1]
     if normalize:
-        kernel = relay.full(_op.const(1 / math.prod(size[2:]), d_type), size, d_type)
+        kernel = relay.full(tvm_op.const(1 / math.prod(size[2:]), d_type), size, d_type)
     else:
         kernel = relay.ones(size, d_type)
     out = deconv_converter(data,
@@ -1199,7 +1195,7 @@ def unsqueeze_converter(data,
         if axis < 0 and isinstance(data, tvm_expr.Var):
             axis = len(data.type_annotation.concrete_shape) + len(axes) + axis
 
-        data = _op.expand_dims(data, axis=axis, num_newaxis=1)
+        data = tvm_op.expand_dims(data, axis=axis, num_newaxis=1)
     return data
 
 
@@ -1329,7 +1325,7 @@ def matmul_converter(a, b, transposeA, transposeB, **kwargs):
 
     # TODO batch matmul if needed
 
-    out = _op.nn.matmul(a, b, transpose_a=transposeA, transpose_b=transposeB)
+    out = tvm_op.nn.matmul(a, b, transpose_a=transposeA, transpose_b=transposeB)
 
     return out
 
@@ -1460,7 +1456,7 @@ def linear_converter(data,
 
     if not res:
         # squeeze needed because nnef has bias of shape [1, channel]
-        res = _op.nn.bias_add(out, relay.squeeze(bias, axis=0))
+        res = tvm_op.nn.bias_add(out, relay.squeeze(bias, axis=0))
 
     return res
 
