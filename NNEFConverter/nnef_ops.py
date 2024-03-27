@@ -1323,9 +1323,40 @@ def matmul_converter(a, b, transposeA, transposeB, **kwargs):
     if kwargs:
         __unexpected_attrs('matmul', kwargs)
 
-    # TODO batch matmul if needed
+    a_shape = infer_shape(a)
+    b_shape = infer_shape(b)
+    a_rank = len(a_shape)
+    b_rank = len(b_shape)
 
-    out = tvm_op.nn.matmul(a, b, transpose_a=transposeA, transpose_b=transposeB)
+    if a_rank == 2 and b_rank == 2:
+        out = tvm_op.nn.matmul(a, b, transpose_a=transposeA, transpose_b=transposeB)
+    else:
+        batch_shape = [1] * (max(a_rank, b_rank) - 2)
+
+        for i, j in enumerate(reversed(a_shape[:-2])):
+            batch_shape[i] = j
+
+        for i, j in enumerate(reversed(b_shape[:-2])):
+            # Need to check if axis can be broadcasted
+            if batch_shape[i] == 1 or j == 1 or batch_shape[i] == j:
+                batch_shape[i] = max(batch_shape[i], j)
+            else:
+                msg = "Batch dimensions are not broadcastable."
+                raise AssertionError(msg)
+
+        batch_shape = batch_shape[::-1]
+
+        a = tvm_op.broadcast_to(a, batch_shape + list(a_shape[-2:]))
+        b = tvm_op.broadcast_to(b, batch_shape + list(b_shape[-2:]))
+
+        out = tvm_op.nn.batch_matmul(
+            tvm_op.reshape(a, [-1, *a_shape[-2:]]),
+            tvm_op.reshape(b, [-1, *b_shape[-2:]]),
+            transpose_b=False,
+        )
+
+        out_shape = batch_shape + [a_shape[-2]] + [b_shape[-1]]
+        out = tvm_op.reshape(out, out_shape)
 
     return out
 
