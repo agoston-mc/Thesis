@@ -103,8 +103,10 @@ class NNEF_Converter:
             self._inputs[inp] = self._nodes[inp]
 
     def _construct_nodes(self, graph):
+        """Construct TVM relay calls from every operation of the nnef graph"""
         for op in graph.operations:
             if op.name == 'external':
+                # externals are handled as input, not needed, but nnef treats them as operations as well
                 continue
 
             if op.name == 'variable':
@@ -114,6 +116,7 @@ class NNEF_Converter:
                 self._set_const(op)
 
             else:
+                # every other operator can be grouped more easily, as it does not need self for conversion
                 self._set_literal_inputs(op)
                 self._set_parameter_span(op, op.name)
                 inputs = []
@@ -168,6 +171,7 @@ class NNEF_Converter:
                         self._nodes[out] = converted[i]
 
     def _set_const(self, node):
+        """Create a tvm.relay.Constant from a nnef constant tensor"""
         name = node.outputs['output']
         data = node.attribs['value']
         shape = node.attribs['shape']
@@ -179,6 +183,7 @@ class NNEF_Converter:
         self._nodes[name] = self._consts[name]
 
     def _set_variable(self, tensor):
+        """Create a tvm.relay.Var (or Constant if freeze_vars) from a nnef variable tensor"""
         tens_data = tensor.data
         if self._freeze_vars:
             self._consts[tensor.name] = tvm_expr.const(tens_data)
@@ -189,6 +194,8 @@ class NNEF_Converter:
             self._params[tensor.name] = tens_data
 
     def _set_literal_inputs(self, node):
+        """Checks if node has literal inputs and saves them into a tvm.relay.Constant.
+            naming as {node.name}_{input field name} """
         for field_name, value in node.inputs.items():
             if isinstance(value, list):
                 for v in value:
