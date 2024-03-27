@@ -8,41 +8,12 @@ import numpy as np
 import tvm
 from tvm import relay
 
-from tvm.relay import expr as tmv_expr
-from tvm.relay import op as _op
+from tvm.relay import expr as tvm_expr
+from tvm.relay import op as tvm_op
 from tvm.relay.frontend.common import get_relay_op, infer_shape
 
 
 # Base methods
-
-def get_type(elem_type):
-    """
-    Gives numpy style type for nnef primitive types, uses x32 versions.
-
-    :param elem_type: string, (scalar, integer, logical, string)
-    :return: returns numpy dtype equivalent (float32, int32, bool, string)
-    """
-    if elem_type == 'scalar':
-        return 'float32'
-    if elem_type == 'integer':
-        return 'int32'
-    if elem_type == 'logical':
-        return 'bool'
-    if elem_type == 'string':
-        return 'string'
-    raise TypeError(f'Type \'{elem_type}\' is not implemented')
-
-
-def infer_type(val):
-    if isinstance(val, bool):
-        return 'bool'
-    if isinstance(val, float):
-        return 'float32'
-    if isinstance(val, int):
-        return 'int32'
-    if isinstance(val, str):
-        return 'string'
-    raise TypeError(f'Value \'{val}\' is not a recognized type')
 
 
 def dimension_picker(prefix, kernel_shape, suffix=''):
@@ -184,8 +155,12 @@ def _padding_conv(padding, rank, keepdims=False):
 
 def _calculate_nnef_padding(active_shape, strides, kernel_shape, dilation):
     # ordering of nnef autopad and tvm autopad sometimes is different, implementing nnef style padding calculation
+    # active_shape is the data dimensions
+    # strides is the strides over the active dimensions
+    # kernel_shape is the shape of the window, must have the same rank as active shape
+    # dilation is the dilations over the active dimensions
     output = [(ui + (s - 1)) // s for ui, s in zip(active_shape, strides)]
-    dilated = [(f - 1) * d + 1 for f, d in zip(kernel_shape[2:], dilation)]
+    dilated = [(f - 1) * d + 1 for f, d in zip(kernel_shape, dilation)]
     total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, strides, dilated, active_shape)]
     padding = [(pad // 2, (pad + 1) // 2) for pad in total]
     return padding
@@ -197,10 +172,6 @@ def _calculate_nnef_padding_deconv(data_sh, strides, kernel_active_sh, dilation,
     total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in
              zip(data_sh, strides, dilated, out_sh)]
     return total, out_sh
-
-
-def make_parameter_span(source_name_list, name_sep="."):
-    return name_sep.join(source_name_list)
 
 
 def __unexpected_attrs(op, kwargs):
@@ -371,7 +342,7 @@ def rcp_converter(data,
     if kwargs:
         __unexpected_attrs('rcp', kwargs)
 
-    return div_converter(tmv_expr.const(1, dtype=data.type_annotation.dtype), data)
+    return div_converter(tvm_expr.const(1, dtype=data.type_annotation.dtype), data)
 
 
 def exp_converter(data,
@@ -657,7 +628,7 @@ def sqr_converter(data,
     if kwargs:
         __unexpected_attrs('sqr', kwargs)
 
-    return get_relay_op('power')(data, tmv_expr.const(2.0, dtype=data.type_annotation.dtype))
+    return get_relay_op('power')(data, tvm_expr.const(2.0, dtype=data.type_annotation.dtype))
 
 
 def sqrt_converter(data,
@@ -673,7 +644,7 @@ def rsqr_converter(data,
     if kwargs:
         __unexpected_attrs('rsqr', kwargs)
 
-    return get_relay_op('power')(data, tmv_expr.const(-2.0, dtype=data.type_annotation.dtype))
+    return get_relay_op('power')(data, tvm_expr.const(-2.0, dtype=data.type_annotation.dtype))
 
 
 def rsqrt_converter(data,
@@ -747,7 +718,7 @@ def conv_converter(data,
             (1,) * (len(kernel_shape) - 2))
 
     if not padding:
-        padding = _calculate_nnef_padding(dshape[2:], strides, kernel_shape, dilation)
+        padding = _calculate_nnef_padding(dshape[2:], strides, kernel_shape[2:], dilation)
 
     pad = _padding_conv(padding, len(kernel_shape))
 
@@ -769,14 +740,14 @@ def conv_converter(data,
     )
 
     res = None
-    if isinstance(bias, tmv_expr.Constant):
+    if isinstance(bias, tvm_expr.Constant):
         # nnef has bias of 0 if it is not needed
         if (bias.data.numpy() == 0).all():
             res = conv_out
 
     if not res:
         # squeeze needed as nnef has bias of shape [1, channel]
-        res = _op.nn.bias_add(conv_out, relay.squeeze(bias, axis=0))
+        res = tvm_op.nn.bias_add(conv_out, relay.squeeze(bias, axis=0))
 
     return res
 
@@ -837,13 +808,13 @@ def deconv_converter(data,
     )
 
     res = None
-    if isinstance(bias, tmv_expr.Constant):
+    if isinstance(bias, tvm_expr.Constant):
         if bias.data.numpy() == np.array([0.0]):
             res = deconv_out
 
     if not res:
         # squeeze needed bc nnef has bias of shape [1, channel]
-        res = _op.nn.bias_add(deconv_out, relay.squeeze(bias, axis=0))
+        res = tvm_op.nn.bias_add(deconv_out, relay.squeeze(bias, axis=0))
 
     return res
 
@@ -864,12 +835,12 @@ def box_converter(data,
     d_type = data.type_annotation.dtype
     size[0] = dshape[1]
     if normalize:
-        kernel = relay.full(_op.const(1 / math.prod(size[2:]), d_type), size, d_type)
+        kernel = relay.full(tvm_op.const(1 / math.prod(size[2:]), d_type), size, d_type)
     else:
         kernel = relay.ones(size, d_type)
     out = conv_converter(data,
                          kernel,
-                         tmv_expr.const(0, dtype=data.type_annotation.dtype),
+                         tvm_expr.const(0, dtype=data.type_annotation.dtype),
                          border,
                          stride,
                          padding,
@@ -934,12 +905,12 @@ def debox_converter(data,
     d_type = data.type_annotation.dtype
     size[0] = dshape[1]
     if normalize:
-        kernel = relay.full(_op.const(1 / math.prod(size[2:]), d_type), size, d_type)
+        kernel = relay.full(tvm_op.const(1 / math.prod(size[2:]), d_type), size, d_type)
     else:
         kernel = relay.ones(size, d_type)
     out = deconv_converter(data,
                            kernel,
-                           tmv_expr.const(0, dtype=data.type_annotation.dtype),
+                           tvm_expr.const(0, dtype=data.type_annotation.dtype),
                            border,
                            stride,
                            padding,
@@ -1062,7 +1033,7 @@ def multilinear_upsample_converter(data,
     symmetric = method == 'symmetric'
     weights = _upsample_weights_nd(factor, symmetric)
     weights = np.reshape(weights, newshape=(1, 1) + weights.shape)
-    kernel = tile_converter(tmv_expr.const(weights), (c, 1) + (1,) * len(factor))
+    kernel = tile_converter(tvm_expr.const(weights), (c, 1) + (1,) * len(factor))
     # np.tile(np.reshape(weights, newshape=(1, 1) + weights.shape), reps=(c, 1) + (1,) * len(factor))
 
     output_shape = [n, c] + [f * s for f, s in zip(factor, dshape[2:])]
@@ -1070,7 +1041,7 @@ def multilinear_upsample_converter(data,
     if symmetric:
         return deconv_converter(data,
                                 kernel,
-                                tmv_expr.const(0.0),
+                                tvm_expr.const(0.0),
                                 border='constant',
                                 stride=factor,
                                 padding=[(f - 1, f - 1) for f in factor],
@@ -1081,16 +1052,17 @@ def multilinear_upsample_converter(data,
     else:
         replicate = border == 'replicate'
         if replicate:
-            data = pad_converter(data, [(0, 0), (0, 0)] + [(1, 0)] * len(factor), border, tmv_expr.const(0.0))
-            # nnef_pad(input, padding=[(0, 0), (0, 0)] + [(1, 0)] * rank, border=border)
+            data = pad_converter(data, [(0, 0), (0, 0)] + [(1, 0)] * len(factor), border, tvm_expr.const(0.0))
+            padding = factor
+        else:
+            padding = [f // 2 for f in factor]
 
-        padding = factor if replicate else [f // 2 for f in factor]
         return deconv_converter(data,
                                 kernel,
-                                tmv_expr.const(0.0),
+                                tvm_expr.const(0.0),
                                 border='constant',
                                 stride=factor,
-                                padding=[(p, p) for p in padding],
+                                padding=[(p, p-1) for p in padding],
                                 dilation=[],
                                 groups=c,
                                 output_shape=output_shape,
@@ -1220,10 +1192,10 @@ def unsqueeze_converter(data,
 
     axes = sorted(axes)
     for axis in axes:
-        if axis < 0 and isinstance(data, tmv_expr.Var):
+        if axis < 0 and isinstance(data, tvm_expr.Var):
             axis = len(data.type_annotation.concrete_shape) + len(axes) + axis
 
-        data = _op.expand_dims(data, axis=axis, num_newaxis=1)
+        data = tvm_op.expand_dims(data, axis=axis, num_newaxis=1)
     return data
 
 
@@ -1291,7 +1263,7 @@ def unstack_converter(data,
     res = []
     for i in range(len(split)):
         res.append(squeeze_converter(split[i], axis))
-    return tmv_expr.TupleWrapper(relay.Tuple(res), len(res))
+    return tvm_expr.TupleWrapper(relay.Tuple(res), len(res))
 
 
 # todo test
@@ -1351,9 +1323,40 @@ def matmul_converter(a, b, transposeA, transposeB, **kwargs):
     if kwargs:
         __unexpected_attrs('matmul', kwargs)
 
-    # TODO batch matmul if needed
+    a_shape = infer_shape(a)
+    b_shape = infer_shape(b)
+    a_rank = len(a_shape)
+    b_rank = len(b_shape)
 
-    out = _op.nn.matmul(a, b, transpose_a=transposeA, transpose_b=transposeB)
+    if a_rank == 2 and b_rank == 2:
+        out = tvm_op.nn.matmul(a, b, transpose_a=transposeA, transpose_b=transposeB)
+    else:
+        batch_shape = [1] * (max(a_rank, b_rank) - 2)
+
+        for i, j in enumerate(reversed(a_shape[:-2])):
+            batch_shape[i] = j
+
+        for i, j in enumerate(reversed(b_shape[:-2])):
+            # Need to check if axis can be broadcasted
+            if batch_shape[i] == 1 or j == 1 or batch_shape[i] == j:
+                batch_shape[i] = max(batch_shape[i], j)
+            else:
+                msg = "Batch dimensions are not broadcastable."
+                raise AssertionError(msg)
+
+        batch_shape = batch_shape[::-1]
+
+        a = tvm_op.broadcast_to(a, batch_shape + list(a_shape[-2:]))
+        b = tvm_op.broadcast_to(b, batch_shape + list(b_shape[-2:]))
+
+        out = tvm_op.nn.batch_matmul(
+            tvm_op.reshape(a, [-1, *a_shape[-2:]]),
+            tvm_op.reshape(b, [-1, *b_shape[-2:]]),
+            transpose_b=False,
+        )
+
+        out_shape = batch_shape + [a_shape[-2]] + [b_shape[-1]]
+        out = tvm_op.reshape(out, out_shape)
 
     return out
 
@@ -1404,9 +1407,9 @@ def elu_converter(data,
     if kwargs:
         __unexpected_attrs('elu', kwargs)
 
-    return select_converter(lt_converter(data, tmv_expr.const(0.0)),
-                            mul_converter(tmv_expr.const(alpha),
-                                          sub_converter(exp_converter(data), tmv_expr.const(1.0))),
+    return select_converter(lt_converter(data, tvm_expr.const(0.0)),
+                            mul_converter(tvm_expr.const(alpha),
+                                          sub_converter(exp_converter(data), tvm_expr.const(1.0))),
                             data)
 
 
@@ -1417,10 +1420,10 @@ def selu_converter(data,
     if kwargs:
         __unexpected_attrs('selu', kwargs)
 
-    return mul_converter(tmv_expr.const(lambda_var),
-                         select_converter(data < tmv_expr.const(0.0),
-                                          mul_converter(tmv_expr.const(alpha),
-                                                        sub_converter(exp_converter(data), tmv_expr.const(1.0))),
+    return mul_converter(tvm_expr.const(lambda_var),
+                         select_converter(data < tvm_expr.const(0.0),
+                                          mul_converter(tvm_expr.const(alpha),
+                                                        sub_converter(exp_converter(data), tvm_expr.const(1.0))),
                                           data))
 
 
@@ -1434,7 +1437,7 @@ def gelu_converter(data,
     # CDF of the standard normal distribution, which can be approximated
     # for example by sigmoid(1.702 * x)
 
-    return mul_converter(data, sigmoid_converter(mul_converter(tmv_expr.const(1.702), data)))
+    return mul_converter(data, sigmoid_converter(mul_converter(tvm_expr.const(1.702), data)))
 
 
 def silu_converter(data,
@@ -1463,7 +1466,7 @@ def softplus_converter(data,
     if kwargs:
         __unexpected_attrs('softplus', kwargs)
 
-    return log_converter(add_converter(exp_converter(data), tmv_expr.const(1.0)))
+    return log_converter(add_converter(exp_converter(data), tvm_expr.const(1.0)))
 
 
 #   # linear ops
@@ -1478,13 +1481,13 @@ def linear_converter(data,
     out = get_relay_op('matmul')(data, filter, transpose_b=True)
     res = None
 
-    if isinstance(bias, tmv_expr.Constant):
+    if isinstance(bias, tvm_expr.Constant):
         if (bias.data.numpy() == 0).all():
             res = out
 
     if not res:
         # squeeze needed because nnef has bias of shape [1, channel]
-        res = _op.nn.bias_add(out, relay.squeeze(bias, axis=0))
+        res = tvm_op.nn.bias_add(out, relay.squeeze(bias, axis=0))
 
     return res
 
@@ -1562,7 +1565,7 @@ def max_pool_converter(data,
 
     if border == 'constant':
         padding = [(0, 0), (0, 0)] + padding
-        data = pad_converter(data, padding, border, tmv_expr.const(0.0))
+        data = pad_converter(data, padding, border, tvm_expr.const(0.0))
         pad = (0, 0)
 
     op = get_relay_op(dimension_picker('max_pool', dshape))
@@ -1676,7 +1679,7 @@ def local_variance_normalization_converter(data,
 
     sigma = box_converter(sqr_converter(data), size, 'constant', [], [], [], normalize=True)
     return div_converter(data,
-                         max_converter(add_converter(sqrt_converter(sigma), tmv_expr.const(bias)),
+                         max_converter(add_converter(sqrt_converter(sigma), tvm_expr.const(bias)),
                                        epsilon))
 
 
@@ -1701,7 +1704,7 @@ def l1_normalization_converter(data,
         __unexpected_attrs('l1_normalization', kwargs)
 
     sigma = sum_reduce_converter(abs_converter(data), axes, False)
-    return div_converter(data, max_converter(add_converter(sigma, tmv_expr.const(bias)),
+    return div_converter(data, max_converter(add_converter(sigma, tvm_expr.const(bias)),
                                              epsilon))
 
 
