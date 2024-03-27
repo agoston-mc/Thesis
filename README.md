@@ -1,7 +1,8 @@
 # NNEF to TVM converter
 
 Converts an NNEF model into a TVM relay module, ready for compiling and deployment.
-Using the python API of tvm
+
+Using tvm's [python API](https://tvm.apache.org/docs/reference/api/python/index.html "TVM docs")
 
 
 ## Usage
