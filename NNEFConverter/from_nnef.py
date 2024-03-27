@@ -199,14 +199,12 @@ class NNEF_Converter:
         for field_name, value in node.inputs.items():
             if isinstance(value, list):
                 for v in value:
-                    dtype, is_literal = self._infer_type(v)
-                    if is_literal:
-                        self._nodes[f'{node.name}_{v}'] = tvm_expr.const(np.array(v, dtype=get_type(node.dtype)))
+                    if v not in self._nodes.keys():
+                        self._nodes[f'{node.name}_{v}'] = tvm_expr.const(v)
 
             else:
-                dtype, is_literal = self._infer_type(value)
-                if is_literal:
-                    self._nodes[f'{node.name}_{field_name}'] = tvm_expr.const(np.array(value, dtype=dtype))
+                if value not in self._nodes.keys():
+                    self._nodes[f'{node.name}_{field_name}'] = tvm_expr.const(value)
 
     def _set_parameter_span(self, node, node_source_name):
         for field_name, name in node.inputs.items():
@@ -217,22 +215,19 @@ class NNEF_Converter:
                 self._set_par_span_helper(node, node_source_name, name, field_name)
 
     def _set_par_span_helper(self, node, node_source_name, name, field_name):
-        _, is_literal = self._infer_type(name)
-        if is_literal:
+        if name not in self._nodes.keys():
             name = f'{node.name}_{field_name}'
 
         expr = self._nodes.get(name)
+        if expr:
+            if isinstance(expr, relay.Constant):
+                if name not in self._consts:
+                    name = f'{node.name}_const'
+            expr_with_span = set_span(expr, make_parameter_span([node_source_name, name]))
+            self._nodes[name] = expr_with_span
+            if name in self._inputs:
+                self._inputs[name] = expr_with_span
 
-        if isinstance(expr, relay.Constant):
-            if name not in self._consts:
-                name = f'{node.name}_const'
-        expr_with_span = set_span(expr, make_parameter_span([node_source_name, name]))
-        self._nodes[name] = expr_with_span
-        if name in self._inputs:
-            self._inputs[name] = expr_with_span
-
-        # if not isinstance(expr, relay.expr.RelayExpr):
-        #     raise TypeError(f'Failed to interpret {name}, while setting the span for {node_source_name}')
 
     def _get_relay_op_call(self, name, inputs, attrs):
         """Returns the tvm.Call equivalent to the nnef operator"""
