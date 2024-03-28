@@ -1394,6 +1394,11 @@ def prelu_converter(data,
     if kwargs:
         __unexpected_attrs('prelu', kwargs)
 
+    # prelu can't handle float vals but NNEF supports direct parameter, this is just in case
+    if isinstance(alpha, tvm_expr.Constant):
+        if alpha.data.numpy().size == 1:
+            return get_relay_op('leaky_relu')(data, alpha.data.numpy().item())
+
     return get_relay_op('prelu')(data, alpha)
 
 
