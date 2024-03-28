@@ -1174,8 +1174,8 @@ def reshape_converter(data,
     if axis_count == -1:
         newshape = dshape[:axis_start] + shape
     else:
-        suffix_len = len(dshape) - len(shape) - axis_start - axis_count + 1
-        newshape = dshape[:axis_start] + shape + dshape[- suffix_len:]
+        newshape = dshape
+        newshape[axis_start:axis_start+axis_count] = shape
 
     return get_relay_op('reshape')(data, newshape)
 
