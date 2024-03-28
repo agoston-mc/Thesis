@@ -1277,13 +1277,13 @@ def slice_converter(data,
                     axes,
                     begin,
                     end,
+                    stride,
                     **kwargs):
     if kwargs:
         __unexpected_attrs('slice', kwargs)
 
-    # Needs manual stride overwrite because TVM slice breaks at multiple axes,
-    # TODO?? check with TVM
-    stride = [1] * len(axes)
+    if not stride:
+        stride = [1] * len(axes)
 
     return get_relay_op('strided_slice')(data, begin, end, strides=stride, axes=axes)
 
