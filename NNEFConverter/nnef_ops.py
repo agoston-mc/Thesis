@@ -684,7 +684,11 @@ def clamp_converter(x, a, b,
     if kwargs:
         __unexpected_attrs('clamp', kwargs)
 
-    return get_relay_op('clip')(x, b, a)
+    # only works if b and a are Constant floats, not tensors
+    if isinstance(a, tvm_expr.Constant) and isinstance(b, tvm_expr.Constant):
+        return get_relay_op('clip')(x, float(a.data.numpy()), float(b.data.numpy()))
+
+    return max_converter(min_converter(x, b), a)
 
 
 # todo test case
