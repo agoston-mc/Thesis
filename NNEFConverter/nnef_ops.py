@@ -1425,8 +1425,11 @@ def elu_converter(data,
 
 def selu_converter(data,
                    alpha,
-                   lambda_var,
+                   # lambda,
                    **kwargs):
+    """True signature is selu_converter(data, alpha, lambda)"""
+    lambda_var = kwargs.pop('lambda')
+
     if kwargs:
         __unexpected_attrs('selu', kwargs)
 
