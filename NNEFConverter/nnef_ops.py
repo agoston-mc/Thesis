@@ -1333,7 +1333,7 @@ def matmul_converter(a, b, transposeA, transposeB, **kwargs):
     b_rank = len(b_shape)
 
     if a_rank == 2 and b_rank == 2:
-        out = tvm_op.nn.matmul(a, b, transpose_a=transposeA, transpose_b=transposeB)
+        out = get_relay_op('matmul')(a, b, transpose_a=transposeA, transpose_b=transposeB)
     else:
         batch_shape = [1] * (max(a_rank, b_rank) - 2)
 
@@ -1353,10 +1353,11 @@ def matmul_converter(a, b, transposeA, transposeB, **kwargs):
         a = tvm_op.broadcast_to(a, batch_shape + list(a_shape[-2:]))
         b = tvm_op.broadcast_to(b, batch_shape + list(b_shape[-2:]))
 
-        out = tvm_op.nn.batch_matmul(
+        out = get_relay_op('batch_matmul')(
             tvm_op.reshape(a, [-1, *a_shape[-2:]]),
             tvm_op.reshape(b, [-1, *b_shape[-2:]]),
-            transpose_b=False,
+            transpose_b=transposeB,
+            transpose_a=transposeA,
         )
 
         out_shape = batch_shape + [a_shape[-2]] + [b_shape[-1]]
