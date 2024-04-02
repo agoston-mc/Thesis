@@ -1442,16 +1442,24 @@ def selu_converter(data,
 
 def gelu_converter(data,
                    **kwargs):
+    """
+    NNEF definition for GELU:
+    the exact definition of GELU is x * Phi(x) where Phi(x) is the
+    CDF of the standard normal distribution, which can be approximated
+    for example by sigmoid(1.702 * x)
+
+    `mul_converter(data, sigmoid_converter(mul_converter(tvm_expr.const(1.702), data)))`
+
+    But in this case we will use the erf to calculate normcdf (same as to pytorch GELU impl)
+    """
     if kwargs:
         __unexpected_attrs('gelu', kwargs)
 
-    # NNEF definition for gelu:
-    # the exact definition of gelu is x * Phi(x) where Phi(x) is the
-    # CDF of the standard normal distribution, which can be approximated
-    # for example by sigmoid(1.702 * x)
-
-    return mul_converter(data, sigmoid_converter(mul_converter(tvm_expr.const(1.702), data)))
-
+    return data * (
+            tvm_expr.const(0.5)
+            + tvm_op.erf(data * tvm_expr.const(0.5 ** 0.5)) * tvm_expr.const(0.5)
+    )
+# ok
 
 def silu_converter(data,
                    **kwargs):
