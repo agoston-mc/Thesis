@@ -327,6 +327,7 @@ def copy_converter(data,
         __unexpected_attrs('copy', kwargs)
 
     return get_relay_op('copy')(data)
+# ok
 
 
 def neg_converter(data,
@@ -335,6 +336,7 @@ def neg_converter(data,
         __unexpected_attrs('neg', kwargs)
 
     return get_relay_op('negative')(data)
+# ok
 
 
 def rcp_converter(data,
@@ -357,6 +359,7 @@ def exp_converter(data,
         __unexpected_attrs('exp', kwargs)
 
     return get_relay_op('exp')(data)
+# ok
 
 
 def log_converter(data,
@@ -365,6 +368,7 @@ def log_converter(data,
         __unexpected_attrs('log', kwargs)
 
     return get_relay_op('log')(data)
+# ok
 
 
 def sin_converter(data,
@@ -373,6 +377,7 @@ def sin_converter(data,
         __unexpected_attrs('sin', kwargs)
 
     return get_relay_op('sin')(data)
+# ok
 
 
 def cos_converter(data,
@@ -381,6 +386,7 @@ def cos_converter(data,
         __unexpected_attrs('cos', kwargs)
 
     return get_relay_op('cos')(data)
+# ok
 
 
 def tan_converter(data,
@@ -389,6 +395,7 @@ def tan_converter(data,
         __unexpected_attrs('tan', kwargs)
 
     return get_relay_op('tan')(data)
+# ok
 
 
 def sinh_converter(data,
@@ -397,6 +404,7 @@ def sinh_converter(data,
         __unexpected_attrs('sinh', kwargs)
 
     return get_relay_op('sinh')(data)
+# ok
 
 
 def cosh_converter(data,
@@ -405,6 +413,7 @@ def cosh_converter(data,
         __unexpected_attrs('cosh', kwargs)
 
     return get_relay_op('cosh')(data)
+# ok
 
 
 def tanh_converter(data,
@@ -413,6 +422,7 @@ def tanh_converter(data,
         __unexpected_attrs('tanh', kwargs)
 
     return get_relay_op('tanh')(data)
+# ok
 
 
 def asin_converter(data,
@@ -421,6 +431,7 @@ def asin_converter(data,
         __unexpected_attrs('asin', kwargs)
 
     return get_relay_op('asin')(data)
+# ok
 
 
 def acos_converter(data,
@@ -429,6 +440,7 @@ def acos_converter(data,
         __unexpected_attrs('acos', kwargs)
 
     return get_relay_op('acos')(data)
+# ok
 
 
 def atan_converter(data,
@@ -437,6 +449,7 @@ def atan_converter(data,
         __unexpected_attrs('atan', kwargs)
 
     return get_relay_op('atan')(data)
+# ok
 
 
 def asinh_converter(data,
@@ -445,6 +458,7 @@ def asinh_converter(data,
         __unexpected_attrs('asinh', kwargs)
 
     return get_relay_op('asinh')(data)
+# ok
 
 
 def acosh_converter(data,
@@ -453,6 +467,7 @@ def acosh_converter(data,
         __unexpected_attrs('acosh', kwargs)
 
     return get_relay_op('acosh')(data)
+# ok
 
 
 def atanh_converter(data,
@@ -461,6 +476,7 @@ def atanh_converter(data,
         __unexpected_attrs('atanh', kwargs)
 
     return get_relay_op('atanh')(data)
+# ok
 
 
 def abs_converter(data,
@@ -469,6 +485,7 @@ def abs_converter(data,
         __unexpected_attrs('abs', kwargs)
 
     return get_relay_op('abs')(data)
+# ok
 
 
 def sign_converter(data,
@@ -477,6 +494,7 @@ def sign_converter(data,
         __unexpected_attrs('sign', kwargs)
 
     return get_relay_op('sign')(data)
+# ok
 
 
 def not_converter(data,
@@ -485,6 +503,7 @@ def not_converter(data,
         __unexpected_attrs('not', kwargs)
 
     return get_relay_op('logical_not')(data)
+# ok
 
 
 def floor_converter(data,
@@ -493,6 +512,7 @@ def floor_converter(data,
         __unexpected_attrs('floor', kwargs)
 
     return get_relay_op('floor')(data)
+# ok
 
 
 def ceil_converter(data,
@@ -501,6 +521,7 @@ def ceil_converter(data,
         __unexpected_attrs('ceil', kwargs)
 
     return get_relay_op('ceil')(data)
+# ok
 
 
 def round_converter(data,
@@ -509,6 +530,7 @@ def round_converter(data,
         __unexpected_attrs('round', kwargs)
 
     return get_relay_op('round')(data)
+# ok
 
 
 #   # Binary ops
@@ -519,6 +541,7 @@ def add_converter(lhs, rhs,
         __unexpected_attrs('add', kwargs)
 
     return get_relay_op('add')(lhs, rhs)
+# ok
 
 
 def sub_converter(lhs, rhs,
@@ -527,6 +550,7 @@ def sub_converter(lhs, rhs,
         __unexpected_attrs('sub', kwargs)
 
     return get_relay_op('subtract')(lhs, rhs)
+# ok
 
 
 def mul_converter(lhs, rhs,
@@ -535,6 +559,7 @@ def mul_converter(lhs, rhs,
         __unexpected_attrs('mul', kwargs)
 
     return get_relay_op('multiply')(lhs, rhs)
+# ok
 
 
 def div_converter(lhs, rhs,
@@ -543,6 +568,7 @@ def div_converter(lhs, rhs,
         __unexpected_attrs('div', kwargs)
 
     return get_relay_op('divide')(lhs, rhs)
+# ok
 
 
 def pow_converter(lhs, rhs,
@@ -551,6 +577,7 @@ def pow_converter(lhs, rhs,
         __unexpected_attrs('pow', kwargs)
 
     return get_relay_op('power')(lhs, rhs)
+# ok
 
 
 def lt_converter(lhs, rhs,
@@ -559,6 +586,7 @@ def lt_converter(lhs, rhs,
         __unexpected_attrs('lt', kwargs)
 
     return get_relay_op('less')(lhs, rhs)
+# ok
 
 
 def gt_converter(lhs, rhs,
@@ -567,6 +595,7 @@ def gt_converter(lhs, rhs,
         __unexpected_attrs('gt', kwargs)
 
     return get_relay_op('greater')(lhs, rhs)
+# ok
 
 
 def le_converter(lhs, rhs,
@@ -575,6 +604,7 @@ def le_converter(lhs, rhs,
         __unexpected_attrs('le', kwargs)
 
     return get_relay_op('less_equal')(lhs, rhs)
+# ok
 
 
 def ge_converter(lhs, rhs,
@@ -583,6 +613,7 @@ def ge_converter(lhs, rhs,
         __unexpected_attrs('ge', kwargs)
 
     return get_relay_op('greater_equal')(lhs, rhs)
+# ok
 
 
 def eq_converter(lhs, rhs,
@@ -591,6 +622,7 @@ def eq_converter(lhs, rhs,
         __unexpected_attrs('eq', kwargs)
 
     return get_relay_op('equal')(lhs, rhs)
+# ok
 
 
 def ne_converter(lhs, rhs,
@@ -599,6 +631,7 @@ def ne_converter(lhs, rhs,
         __unexpected_attrs('ne', kwargs)
 
     return get_relay_op('not_equal')(lhs, rhs)
+# ok
 
 
 def and_converter(lhs, rhs,
@@ -607,6 +640,7 @@ def and_converter(lhs, rhs,
         __unexpected_attrs('and', kwargs)
 
     return get_relay_op('logical_and')(lhs, rhs)
+# ok
 
 
 def or_converter(lhs, rhs,
@@ -615,6 +649,7 @@ def or_converter(lhs, rhs,
         __unexpected_attrs('or', kwargs)
 
     return get_relay_op('logical_or')(lhs, rhs)
+# ok
 
 
 #   # Select op
@@ -625,6 +660,7 @@ def select_converter(condition, t_val, f_val,
         __unexpected_attrs('select', kwargs)
 
     return get_relay_op('where')(condition, t_val, f_val)
+# ok
 
 
 #   # Simplifier ops
@@ -649,6 +685,7 @@ def sqrt_converter(data,
         __unexpected_attrs('sqrt', kwargs)
 
     return get_relay_op('sqrt')(data)
+# ok
 
 
 def rsqr_converter(data,
@@ -671,6 +708,7 @@ def rsqrt_converter(data,
         __unexpected_attrs('rsqrt', kwargs)
 
     return get_relay_op('rsqrt')(data)
+# ok
 
 
 def log2_converter(data,
@@ -679,6 +717,7 @@ def log2_converter(data,
         __unexpected_attrs('log2', kwargs)
 
     return get_relay_op('log2')(data)
+# ok
 
 
 def min_converter(lhs, rhs,
@@ -687,6 +726,7 @@ def min_converter(lhs, rhs,
         __unexpected_attrs('min', kwargs)
 
     return get_relay_op('minimum')(lhs, rhs)
+# ok
 
 
 def max_converter(lhs, rhs,
@@ -695,6 +735,7 @@ def max_converter(lhs, rhs,
         __unexpected_attrs('max', kwargs)
 
     return get_relay_op('maximum')(lhs, rhs)
+# ok
 
 
 def clamp_converter(x, a, b,
@@ -707,9 +748,7 @@ def clamp_converter(x, a, b,
         return get_relay_op('clip')(x, float(a.data.numpy()), float(b.data.numpy()))
 
     return max_converter(min_converter(x, b), a)
-
-
-# todo test case
+# ok
 
 
 #   # Sliding-window ops
@@ -772,6 +811,7 @@ def conv_converter(data,
         res = tvm_op.nn.bias_add(conv_out, relay.squeeze(bias, axis=0))
 
     return res
+# ok
 
 
 def deconv_converter(data,
@@ -839,6 +879,7 @@ def deconv_converter(data,
         res = tvm_op.nn.bias_add(deconv_out, relay.squeeze(bias, axis=0))
 
     return res
+# ok
 
 
 def box_converter(data,
@@ -864,6 +905,7 @@ def box_converter(data,
         kernel = relay.full(tvm_op.const(1 / math.prod(size[2:]), d_type), size, d_type)
     else:
         kernel = relay.ones(size, d_type)
+
     out = conv_converter(data,
                          kernel,
                          tvm_expr.const(0, dtype=d_type),
@@ -873,45 +915,7 @@ def box_converter(data,
                          dilation,
                          dshape[1])
     return out
-
-    # # check if window size is 1 on N, C, avg pool only supports window on D H W
-    # if size[:2] == [1, 1]:
-    #     out = avg_pool_converter(data, size[2:], 'constant', padding, stride, dilation)
-    #     if not normalize:
-    #         out = mul_converter(out, _expr.const(math.prod(size), dtype='float32'))
-    #     return out
-    #
-    # # not efficient but works for any window size
-    #
-    # strides = stride if stride \
-    #     else (1,) * len(dshape)
-    #
-    # dilation = dilation if dilation \
-    #     else (1,) * len(dshape)
-    #
-    # # padding is truncated to `conv style` (only active layers are present)
-    # active_shape = dshape[2:]
-    # if not padding:
-    #     output = [(ui + (s - 1)) // s for ui, s in zip(active_shape, strides)]
-    #     dilated = [(f - 1) * d + 1 for f, d in zip(size[2:], dilation)]
-    #     total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, strides, dilated, active_shape)]
-    #     padding = [(pad // 2, (pad + 1) // 2) for pad in total]
-    #
-    # data = pad_converter(data, padding, border, _expr.const(0.0, 'float32'))
-    #
-    # leave_out_dims = len([x for x in size if x == 1])
-    #
-    # # generate widows
-    # sw = get_relay_op('sliding_window')(data, leave_out_dims, size[leave_out_dims:], strides[leave_out_dims:])
-    # # collapse generated windows that are over the dim of the input - the ones we need to sum
-    # axes = [len(dshape) + x for x in range(len(dshape) - 2)]
-    #
-    # # L2 normalize in sum_reduce is not good, so define own
-    # out = sum_reduce_converter(sw, axes, False, keepdims=False)
-    # if normalize:
-    #     rhs = _expr.const(np.full([infer_shape(out)], math.prod(size), dtype='float32'))
-    #     out = get_relay_op('divide')(out, rhs)
-    # return out
+# ok
 
 
 def debox_converter(data,
@@ -948,22 +952,7 @@ def debox_converter(data,
                            output_shape,
                            groups=dshape[1])
     return out
-
-
-# def argmax_pool_converter(data,
-#                           size,
-#                           border,
-#                           padding,
-#                           stride,
-#                           dilation,
-#                           **kwargs)
-#                           :
-#     # maybe possible with slicing?
-#
-#     if kwargs:
-#         __unexpected_attrs('argmax_pool', kwargs)
-#
-#     raise NotImplementedError('argmax_pool not implemented')
+# ok
 
 
 def nearest_downsample_converter(data,
@@ -981,6 +970,7 @@ def nearest_downsample_converter(data,
                          stride=[1, 1] + factor,
                          dilation=(1,) * (dims - 2),
                          normalize=False)
+# ok
 
 
 def area_downsample_converter(data,
@@ -998,6 +988,7 @@ def area_downsample_converter(data,
                          stride=[1, 1] + factor,
                          dilation=(1,) * (dims - 2),
                          normalize=True)
+# ok
 
 
 def nearest_upsample_converter(data,
@@ -1015,8 +1006,8 @@ def nearest_upsample_converter(data,
         new_size,
         method='nearest_neighbor',
         # coordinate_transformation_mode='asymmetric',
-        rounding_method='round',
-    )
+        rounding_method='round', )
+# ok
 
 
 def multilinear_upsample_converter(data,
@@ -1092,11 +1083,12 @@ def multilinear_upsample_converter(data,
                                 tvm_expr.const(0.0),
                                 border='constant',
                                 stride=factor,
-                                padding=[(p, p-1) for p in padding],
+                                padding=[(p, p - 1) for p in padding],
                                 dilation=[],
                                 groups=c,
                                 output_shape=output_shape,
                                 )
+# ok
 
 
 #   # Reduce ops
@@ -1111,9 +1103,9 @@ def sum_reduce_converter(data,
 
     out = get_relay_op('sum')(data, axes, keepdims=keepdims)
     if normalize:
-        # TODO?? ask normalization value epsilon?
         return l2_normalization_converter(out, 0, [x - 2 for x in axes], 0.0)
     return out
+# ok
 
 
 def max_reduce_converter(data,
@@ -1124,6 +1116,7 @@ def max_reduce_converter(data,
         __unexpected_attrs('max_reduce', kwargs)
 
     return get_relay_op('max')(data, axes, keepdims=keepdims)
+# ok
 
 
 def min_reduce_converter(data,
@@ -1134,6 +1127,7 @@ def min_reduce_converter(data,
         __unexpected_attrs('min_reduce', kwargs)
 
     return get_relay_op('min')(data, axes, keepdims=keepdims)
+# ok
 
 
 def argmax_reduce_converter(data,
@@ -1144,6 +1138,7 @@ def argmax_reduce_converter(data,
         __unexpected_attrs('argmax_reduce', kwargs)
 
     return get_relay_op('argmax')(data, axes, keepdims=keepdims)
+# ok
 
 
 def argmin_reduce_converter(data,
@@ -1154,6 +1149,7 @@ def argmin_reduce_converter(data,
         __unexpected_attrs('argmin_reduce', kwargs)
 
     return get_relay_op('argmin')(data, axes, keepdims=keepdims)
+# ok
 
 
 def all_reduce_converter(data,
@@ -1164,6 +1160,7 @@ def all_reduce_converter(data,
         __unexpected_attrs('all_reduce', kwargs)
 
     return get_relay_op('all')(data, axes, keepdims=keepdims)
+# ok
 
 
 def any_reduce_converter(data,
@@ -1174,6 +1171,7 @@ def any_reduce_converter(data,
         __unexpected_attrs('any_reduce', kwargs)
 
     return get_relay_op('any')(data, axes, keepdims=keepdims)
+# ok
 
 
 def mean_reduce_converter(data,
@@ -1184,6 +1182,7 @@ def mean_reduce_converter(data,
         __unexpected_attrs('mean_reduce', kwargs)
 
     return get_relay_op('mean')(data, axes, keepdims=keepdims)
+# ok
 
 
 #   # Tensor shape ops
@@ -1201,9 +1200,10 @@ def reshape_converter(data,
         newshape = dshape[:axis_start] + shape
     else:
         newshape = dshape
-        newshape[axis_start:axis_start+axis_count] = shape
+        newshape[axis_start:axis_start + axis_count] = shape
 
     return get_relay_op('reshape')(data, newshape)
+# ok
 
 
 def squeeze_converter(data,
@@ -1212,6 +1212,7 @@ def squeeze_converter(data,
     if kwargs:
         __unexpected_attrs('squeeze', kwargs)
     return relay.squeeze(data, axes)
+# ok
 
 
 def unsqueeze_converter(data,
@@ -1227,9 +1228,7 @@ def unsqueeze_converter(data,
 
         data = tvm_op.expand_dims(data, axis=axis, num_newaxis=1)
     return data
-
-
-# todo test?
+# ok
 
 
 def transpose_converter(data,
@@ -1239,6 +1238,7 @@ def transpose_converter(data,
         __unexpected_attrs('transpose', kwargs)
 
     return get_relay_op('transpose')(data, axes)
+# ok
 
 
 def split_converter(data,
@@ -1260,6 +1260,7 @@ def split_converter(data,
         indices.append(int(s))
 
     return get_relay_op('split')(data, indices, axis)
+# ok
 
 
 def concat_converter(*data,
@@ -1269,6 +1270,7 @@ def concat_converter(*data,
         __unexpected_attrs('concat', kwargs)
 
     return get_relay_op('concatenate')(data, axis)
+# ok
 
 
 def stack_converter(*data,
@@ -1278,9 +1280,8 @@ def stack_converter(*data,
         __unexpected_attrs('stack', kwargs)
 
     return get_relay_op('stack')(data, axis)
+# ok
 
-
-# todo test
 
 
 def unstack_converter(data,
@@ -1294,9 +1295,8 @@ def unstack_converter(data,
     for i in range(len(split)):
         res.append(squeeze_converter(split[i], axis))
     return tvm_expr.TupleWrapper(relay.Tuple(res), len(res))
+# ok
 
-
-# todo test
 
 
 def slice_converter(data,
@@ -1312,9 +1312,8 @@ def slice_converter(data,
         stride = [1] * len(axes)
 
     return get_relay_op('strided_slice')(data, begin, end, strides=stride, axes=axes)
+# ok
 
-
-# todo test
 
 
 def pad_converter(data,
@@ -1332,6 +1331,7 @@ def pad_converter(data,
         border = 'edge'
 
     return get_relay_op('pad')(data, padding, value, border)
+# ok
 
 
 def tile_converter(data,
@@ -1341,6 +1341,7 @@ def tile_converter(data,
         __unexpected_attrs('tile', kwargs)
 
     return get_relay_op('tile')(data, repeats)
+# ok
 
 
 #   # Region-of-interest ops
@@ -1390,9 +1391,8 @@ def matmul_converter(a, b, transposeA, transposeB, **kwargs):
         out = tvm_op.reshape(out, out_shape)
 
     return out
+# ok
 
-
-# todo test all dims
 
 #   # Variable updates
 #   # Compound ops
@@ -1404,6 +1404,7 @@ def sigmoid_converter(data,
         __unexpected_attrs('sigmoid', kwargs)
 
     return get_relay_op('sigmoid')(data)
+# ok
 
 
 def relu_converter(data,
@@ -1412,6 +1413,7 @@ def relu_converter(data,
         __unexpected_attrs('relu', kwargs)
 
     return get_relay_op('relu')(data)
+# ok
 
 
 def prelu_converter(data,
@@ -1426,6 +1428,7 @@ def prelu_converter(data,
             return get_relay_op('leaky_relu')(data, alpha.data.numpy().item())
 
     return get_relay_op('prelu')(data, alpha)
+# ok
 
 
 def leaky_relu_converter(data,
@@ -1435,6 +1438,8 @@ def leaky_relu_converter(data,
         __unexpected_attrs('leaky_relu', kwargs)
 
     return get_relay_op('leaky_relu')(data, alpha)
+# ok
+
 
 
 def elu_converter(data,
@@ -1447,6 +1452,8 @@ def elu_converter(data,
                             mul_converter(tvm_expr.const(alpha),
                                           sub_converter(exp_converter(data), tvm_expr.const(1.0))),
                             data)
+# ok
+
 
 
 def selu_converter(data,
@@ -1464,6 +1471,7 @@ def selu_converter(data,
                                           mul_converter(tvm_expr.const(alpha),
                                                         sub_converter(exp_converter(data), tvm_expr.const(1.0))),
                                           data))
+# ok
 
 
 def gelu_converter(data,
@@ -1493,7 +1501,7 @@ def silu_converter(data,
         __unexpected_attrs('silu', kwargs)
 
     return mul_converter(data, sigmoid_converter(data))
-
+# ok
 
 def softmax_converter(data,
                       axes,
@@ -1506,7 +1514,7 @@ def softmax_converter(data,
     axis = axes[0]
 
     return get_relay_op('softmax')(data, axis)
-
+# ok
 
 def softplus_converter(data,
                        **kwargs):
@@ -1514,7 +1522,7 @@ def softplus_converter(data,
         __unexpected_attrs('softplus', kwargs)
 
     return log_converter(add_converter(exp_converter(data), tvm_expr.const(1.0)))
-
+# ok
 
 #   # linear ops
 
@@ -1537,7 +1545,7 @@ def linear_converter(data,
         res = tvm_op.nn.bias_add(out, relay.squeeze(bias, axis=0))
 
     return res
-
+# ok
 
 def separable_conv_converter(data,
                              plane_filter,
@@ -1574,7 +1582,7 @@ def separable_conv_converter(data,
                           [],
                           [],
                           groups)
-
+# ok
 
 def separable_deconv_converter(data,
                                plane_filter,
@@ -1614,10 +1622,7 @@ def separable_deconv_converter(data,
                             dilation,
                             output_shape,
                             0)
-
-
-# todo test
-
+# ok
 
 def max_pool_converter(data,
                        size,
@@ -1660,7 +1665,7 @@ def max_pool_converter(data,
               dilation=dilation,
               padding=pad,
               )
-
+# ok
 
 def avg_pool_converter(data,
                        size,
@@ -1699,7 +1704,7 @@ def avg_pool_converter(data,
               padding=pad,
               count_include_pad=border != 'ignore'
               )
-
+# ok
 
 def rms_pool(data,
              size,
@@ -1720,7 +1725,7 @@ def rms_pool(data,
             stride=stride,
             dilation=dilation,
         ))
-
+# ok
 
 #   # Normalization
 
@@ -1742,7 +1747,7 @@ def local_response_normalization_converter(data,
                                bias,
                                alpha,
                                beta)
-
+# ok
 
 def local_mean_normalization_converter(data,
                                        size,
@@ -1752,7 +1757,7 @@ def local_mean_normalization_converter(data,
 
     mean = box_converter(data, size, 'constant', [], [], [], normalize=True)
     return sub_converter(data, mean)
-
+# ok
 
 def local_variance_normalization_converter(data,
                                            size,
@@ -1765,8 +1770,8 @@ def local_variance_normalization_converter(data,
     sigma = box_converter(sqr_converter(data), size, 'constant', [], [], [], normalize=True)
     return div_converter(data,
                          max_converter(add_converter(sqrt_converter(sigma), tvm_expr.const(bias)),
-                                       epsilon))
-
+                                       tvm_expr.const(epsilon)))
+# ok
 
 def local_contrast_normalization_converter(data,
                                            size,
@@ -1778,7 +1783,7 @@ def local_contrast_normalization_converter(data,
 
     centered = local_mean_normalization_converter(data, size)
     return local_variance_normalization_converter(centered, size, bias, epsilon)
-
+# ok
 
 def l1_normalization_converter(data,
                                axes,
@@ -1790,8 +1795,8 @@ def l1_normalization_converter(data,
 
     sigma = sum_reduce_converter(abs_converter(data), axes, False)
     return div_converter(data, max_converter(add_converter(sigma, tvm_expr.const(bias)),
-                                             epsilon))
-
+                                             tvm_expr.const(epsilon)))
+# ok
 
 def l2_normalization_converter(data,
                                axes,
@@ -1801,8 +1806,13 @@ def l2_normalization_converter(data,
     if kwargs:
         __unexpected_attrs('l2_normalization', kwargs)
 
-    return get_relay_op('l2_normalize')(data, axes, bias, epsilon)
+    epsilon = epsilon ** 2
+    if bias != 0.0:
+        print('Bias is not supported, assumed 0.0.')
+    #     data = add_converter(data, tvm_expr.const(bias))
 
+    return get_relay_op('l2_normalize')(data, epsilon, axes)
+# ok ish
 
 def batch_normalization_converter(data,
                                   mean,
@@ -1820,6 +1830,6 @@ def batch_normalization_converter(data,
     scale = squeeze_converter(scale, 0)
 
     return get_relay_op('batch_norm')(data, scale, offset, mean, variance, epsilon=epsilon)[0]
-
+# ok
 
 #   # Misc ops
