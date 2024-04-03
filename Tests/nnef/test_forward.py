@@ -75,214 +75,320 @@ def verify_model(
 def test_ats_tan_2d(target, dev):
     verify_model('tan_2d', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_tan_4d(target, dev):
     verify_model('tan_4d', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_sinh_2d(target, dev):
     verify_model('sinh_2d', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_sinh_4d(target, dev):
     verify_model('sinh_4d', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_cosh_2d(target, dev):
     verify_model('cosh_2d', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_cosh_4d(target, dev):
     verify_model('cosh_4d', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_asin_2d(target, dev):
     verify_model('asin_2d', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_asin_4d(target, dev):
     verify_model('asin_4d', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_acos_2d(target, dev):
     verify_model('acos_2d', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_acos_4d(target, dev):
     verify_model('acos_4d', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_atan_2d(target, dev):
     verify_model('atan_2d', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_atan_4d(target, dev):
     verify_model('atan_4d', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_asinh_2d(target, dev):
     verify_model('asinh_2d', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_asinh_4d(target, dev):
     verify_model('asinh_4d', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_acosh_2d(target, dev):
     verify_model('acosh_2d', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_acosh_4d(target, dev):
     verify_model('acosh_4d', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_atanh_2d(target, dev):
     verify_model('atanh_2d', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_atanh_4d(target, dev):
     verify_model('atanh_4d', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_clamp_2d(target, dev):
     verify_model('clamp_2d', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_clamp_4d(target, dev):
     verify_model('clamp_4d', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_clamp_4d_constant(target, dev):
     verify_model('clamp_4d_constant', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_reshape_partial(target, dev):
     verify_model('reshape_partial', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_split_unbalanced(target, dev):
     verify_model('split_unbalanced', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_stack(target, dev):
     verify_model('stack', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_unstack(target, dev):
     verify_model('unstack', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_slice_strides(target, dev):
     verify_model('slice_strides', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_matmul_2d(target, dev):
     verify_model('matmul_2d', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_matmul_2d_transpose(target, dev):
     verify_model('matmul_2d_transpose', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_matmul_4d(target, dev):
     verify_model('matmul_4d', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_matmul_4d_transpose(target, dev):
     verify_model('matmul_4d_transpose', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_prelu(target, dev):
     verify_model('prelu', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_prelu_2d_standalone(target, dev):
     verify_model('prelu_2d_standalone', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_prelu_4d_standalone(target, dev):
     verify_model('prelu_4d_standalone', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_leaky_relu(target, dev):
     verify_model('leaky_relu', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_leaky_relu_2d_standalone(target, dev):
     verify_model('leaky_relu_2d_standalone', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_leaky_relu_4d_standalone(target, dev):
     verify_model('leaky_relu_4d_standalone', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_elu(target, dev):
     verify_model('elu', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_elu_2d_standalone(target, dev):
     verify_model('elu_2d_standalone', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_elu_4d_standalone(target, dev):
     verify_model('elu_4d_standalone', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_selu(target, dev):
     verify_model('selu', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_selu_2d_standalone(target, dev):
     verify_model('selu_2d_standalone', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_selu_4d_standalone(target, dev):
     verify_model('selu_4d_standalone', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_gelu(target, dev):
     verify_model('gelu', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_gelu_2d_standalone(target, dev):
     verify_model('gelu_2d_standalone', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_gelu_4d_standalone(target, dev):
     verify_model('gelu_4d_standalone', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_silu(target, dev):
     verify_model('silu', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_silu_2d_standalone(target, dev):
     verify_model('silu_2d_standalone', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_silu_4d_standalone(target, dev):
     verify_model('silu_4d_standalone', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_softplus(target, dev):
     verify_model('softplus', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_softplus_2d_standalone(target, dev):
     verify_model('softplus_2d_standalone', target, dev, rtol=1e-5, atol=1e-5)
 
+
 @tvm.testing.parametrize_targets
 def test_ats_softplus_4d_standalone(target, dev):
     verify_model('softplus_4d_standalone', target, dev, rtol=1e-5, atol=1e-5)
+
 
 @tvm.testing.parametrize_targets
 def test_ats_separable_conv3x3(target, dev):
     verify_model('separable_conv3x3', target, dev, rtol=1e-5, atol=1e-5)
 
 
+@tvm.testing.parametrize_targets
+def test_ats_separable_conv3x3_with_attrs(target, dev):
+    verify_model('separable_conv3x3_with_attrs', target, dev, rtol=1e-5, atol=1e-5)
 
 
+@tvm.testing.parametrize_targets
+def test_ats_separable_conv5x5(target, dev):
+    verify_model('separable_conv5x5', target, dev, rtol=1e-5, atol=1e-5)
 
+
+@tvm.testing.parametrize_targets
+def test_ats_separable_deconv3x3(target, dev):
+    verify_model('separable_deconv3x3', target, dev, rtol=1e-5, atol=1e-2)
+
+
+@tvm.testing.parametrize_targets
+def test_ats_separable_deconv3x3_with_attrs(target, dev):
+    verify_model('separable_deconv3x3_with_attrs', target, dev, rtol=1e-5, atol=1e-2)
+
+
+@tvm.testing.parametrize_targets
+def test_ats_separable_deconv5x5(target, dev):
+    verify_model('separable_deconv5x5', target, dev, rtol=1e-5, atol=1e-2)
+
+
+@tvm.testing.parametrize_targets
+def test_ats_rms_pool3x3(target, dev):
+    verify_model('rms_pool3x3', target, dev, rtol=1e-5, atol=1e-5)
+
+
+@tvm.testing.parametrize_targets
+def test_ats_local_response_normalization(target, dev):
+    verify_model('local_response_normalization', target, dev, rtol=1e-5, atol=1e-5)
+
+
+@tvm.testing.parametrize_targets
+def test_ats_local_mean_normalization(target, dev):
+    verify_model('local_mean_normalization', target, dev, rtol=1e-5, atol=1e-5)
+
+
+@tvm.testing.parametrize_targets
+def test_ats_local_variance_normalization(target, dev):
+    verify_model('local_variance_normalization', target, dev, rtol=1e-5, atol=1e-5)
+
+
+@tvm.testing.parametrize_targets
+def test_ats_local_contrast_normalization(target, dev):
+    verify_model('local_contrast_normalization', target, dev, rtol=1e-5, atol=1e-5)
+
+
+@tvm.testing.parametrize_targets
+def test_ats_l1_normalization(target, dev):
+    verify_model('l1_normalization', target, dev, rtol=1e-5, atol=1e-5)
+
+
+@tvm.testing.parametrize_targets
+def test_ats_l2_normalization(target, dev):
+    verify_model('l2_normalization', target, dev, rtol=1e-5, atol=1e-5)
 
 
 # GENERATED CASES START
@@ -1456,4 +1562,3 @@ def test_cts_neg_4d(target, dev):
 @tvm.testing.parametrize_targets
 def test_cts_add_4d(target, dev):
     verify_model('add_4d', target, dev, rtol=1e-5, atol=1e-5)
-
