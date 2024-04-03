@@ -287,8 +287,8 @@ def _get_converter_map():
         'softmax': softmax_converter,
         'softplus': softplus_converter,
         'linear': linear_converter,  # linear
-        'separable_conv': ndop,
-        'separable_deconv': ndop,
+        'separable_conv': separable_conv_converter,
+        'separable_deconv': separable_deconv_converter,
         'max_pool_with_index': ndop,  # pooling
         'max_pool': max_pool_converter,
         'avg_pool': avg_pool_converter,
@@ -1526,12 +1526,23 @@ def separable_conv_converter(data,
     if kwargs:
         __unexpected_attrs('separable_conv', kwargs)
 
-    filtered = conv_converter(data, plane_filter, [], border, stride, padding, dilation, groups)
+    filtered = conv_converter(data,
+                              plane_filter,
+                              tvm_expr.const(0, dtype=data.type_annotation.dtype),
+                              border,
+                              stride,
+                              padding,
+                              dilation,
+                              groups)
 
-    return conv_converter(filtered, point_filter, bias, [], [], [], [], groups)
-
-
-# todo test
+    return conv_converter(filtered,
+                          point_filter,
+                          bias,
+                          [],
+                          [],
+                          [],
+                          [],
+                          groups)
 
 
 def separable_deconv_converter(data,
