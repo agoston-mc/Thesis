@@ -1533,7 +1533,7 @@ def separable_conv_converter(data,
                               stride,
                               padding,
                               dilation,
-                              groups)
+                              0)
 
     return conv_converter(filtered,
                           point_filter,
