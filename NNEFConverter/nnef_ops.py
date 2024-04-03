@@ -1553,14 +1553,31 @@ def separable_deconv_converter(data,
                                padding,
                                stride,
                                dilation,
+                               output_shape,
                                groups,
                                **kwargs):
     if kwargs:
         __unexpected_attrs('separable_deconv', kwargs)
 
-    filtered = deconv_converter(data, plane_filter, [], border, stride, padding, dilation, [], groups)
+    filtered = deconv_converter(data,
+                                plane_filter,
+                                tvm_expr.const(0, dtype=data.type_annotation.dtype),
+                                'constant',
+                                [],
+                                [],
+                                [],
+                                [],
+                                groups)
 
-    return deconv_converter(filtered, point_filter, bias, [], [], [], [], [], groups)
+    return deconv_converter(filtered,
+                            point_filter,
+                            bias,
+                            border,
+                            stride,
+                            padding,
+                            dilation,
+                            output_shape,
+                            0)
 
 
 # todo test
