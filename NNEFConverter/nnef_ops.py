@@ -10,7 +10,7 @@ from tvm import relay
 
 from tvm.relay import expr as tvm_expr
 from tvm.relay import op as tvm_op
-from tvm.relay.frontend.common import get_relay_op, infer_shape
+from tvm.relay.frontend.common import get_relay_op, infer_shape, infer_type
 
 
 # Base methods
@@ -342,7 +342,13 @@ def rcp_converter(data,
     if kwargs:
         __unexpected_attrs('rcp', kwargs)
 
-    return div_converter(tvm_expr.const(1, dtype=data.type_annotation.dtype), data)
+    if isinstance(data, relay.Call):
+        d_type = infer_type(data).checked_type.dtype
+    else:
+        d_type = data.type_annotation.dtype
+
+    return div_converter(tvm_expr.const(1, dtype=d_type), data)
+# ok
 
 
 def exp_converter(data,
@@ -628,7 +634,13 @@ def sqr_converter(data,
     if kwargs:
         __unexpected_attrs('sqr', kwargs)
 
-    return get_relay_op('power')(data, tvm_expr.const(2.0, dtype=data.type_annotation.dtype))
+    if isinstance(data, relay.Call):
+        d_type = infer_type(data).checked_type.dtype
+    else:
+        d_type = data.type_annotation.dtype
+
+    return get_relay_op('power')(data, tvm_expr.const(2.0, dtype=d_type))
+# ok
 
 
 def sqrt_converter(data,
@@ -644,7 +656,13 @@ def rsqr_converter(data,
     if kwargs:
         __unexpected_attrs('rsqr', kwargs)
 
-    return get_relay_op('power')(data, tvm_expr.const(-2.0, dtype=data.type_annotation.dtype))
+    if isinstance(data, relay.Call):
+        d_type = infer_type(data).checked_type.dtype
+    else:
+        d_type = data.type_annotation.dtype
+
+    return get_relay_op('power')(data, tvm_expr.const(-2.0, dtype=d_type))
+# ok
 
 
 def rsqrt_converter(data,
@@ -836,7 +854,11 @@ def box_converter(data,
 
     dshape = infer_shape(data)
 
-    d_type = data.type_annotation.dtype
+    if isinstance(data, relay.Call):
+        d_type = infer_type(data).checked_type.dtype
+    else:
+        d_type = data.type_annotation.dtype
+
     size[0] = dshape[1]
     if normalize:
         kernel = relay.full(tvm_op.const(1 / math.prod(size[2:]), d_type), size, d_type)
@@ -844,7 +866,7 @@ def box_converter(data,
         kernel = relay.ones(size, d_type)
     out = conv_converter(data,
                          kernel,
-                         tvm_expr.const(0, dtype=data.type_annotation.dtype),
+                         tvm_expr.const(0, dtype=d_type),
                          border,
                          stride,
                          padding,
@@ -906,7 +928,11 @@ def debox_converter(data,
 
     dshape = infer_shape(data)
 
-    d_type = data.type_annotation.dtype
+    if isinstance(data, relay.Call):
+        d_type = infer_type(data).checked_type.dtype
+    else:
+        d_type = data.type_annotation.dtype
+
     size[0] = dshape[1]
     if normalize:
         kernel = relay.full(tvm_op.const(1 / math.prod(size[2:]), d_type), size, d_type)
@@ -914,7 +940,7 @@ def debox_converter(data,
         kernel = relay.ones(size, d_type)
     out = deconv_converter(data,
                            kernel,
-                           tvm_expr.const(0, dtype=data.type_annotation.dtype),
+                           tvm_expr.const(0, dtype=d_type),
                            border,
                            stride,
                            padding,
@@ -1526,9 +1552,14 @@ def separable_conv_converter(data,
     if kwargs:
         __unexpected_attrs('separable_conv', kwargs)
 
+    if isinstance(data, relay.Call):
+        d_type = infer_type(data).checked_type.dtype
+    else:
+        d_type = data.type_annotation.dtype
+
     filtered = conv_converter(data,
                               plane_filter,
-                              tvm_expr.const(0, dtype=data.type_annotation.dtype),
+                              tvm_expr.const(0, dtype=d_type),
                               border,
                               stride,
                               padding,
@@ -1538,7 +1569,7 @@ def separable_conv_converter(data,
     return conv_converter(filtered,
                           point_filter,
                           bias,
-                          [],
+                          'constant',
                           [],
                           [],
                           [],
@@ -1559,9 +1590,14 @@ def separable_deconv_converter(data,
     if kwargs:
         __unexpected_attrs('separable_deconv', kwargs)
 
+    if isinstance(data, relay.Call):
+        d_type = infer_type(data).checked_type.dtype
+    else:
+        d_type = data.type_annotation.dtype
+
     filtered = deconv_converter(data,
-                                plane_filter,
-                                tvm_expr.const(0, dtype=data.type_annotation.dtype),
+                                point_filter,
+                                tvm_expr.const(0, dtype=d_type),
                                 'constant',
                                 [],
                                 [],
@@ -1570,7 +1606,7 @@ def separable_deconv_converter(data,
                                 groups)
 
     return deconv_converter(filtered,
-                            point_filter,
+                            plane_filter,
                             bias,
                             border,
                             stride,
