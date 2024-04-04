@@ -12,6 +12,7 @@ from tvm.relay.frontend.common import new_var, fold_constant, set_span, infer_ty
 
 from .nnef_ops import _get_converter_map
 
+
 def get_type(elem_type: str):
     """
     Gives numpy style type for nnef primitive types, uses x32 versions.
@@ -155,9 +156,7 @@ class NNEFConverter:
             else:
                 converted = fold_constant(converted.astuple())
         else:
-            converted = tvm_expr.TupleWrapper(
-                fold_constant(converted.astuple()), len(converted)
-            )
+            converted = tvm_expr.TupleWrapper(fold_constant(converted.astuple()), len(converted))
 
         converted = set_span(converted, node.name)
 
@@ -171,6 +170,7 @@ class NNEFConverter:
         else:
             for i, out in zip(range(outputs_num), node.outputs["values"]):
                 self._nodes[out] = converted[i]
+
     def _set_const(self, node):
         """Create a tvm.relay.Constant from a nnef constant tensor"""
         name = node.outputs["output"]
