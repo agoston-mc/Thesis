@@ -1,3 +1,4 @@
+"""NNEF frontend converter helper funcs and ops"""
 import math
 
 import itertools
@@ -7,7 +8,6 @@ import numpy as np
 
 import tvm
 from tvm import relay
-
 from tvm.relay import expr as tvm_expr
 from tvm.relay import op as tvm_op
 from tvm.relay.frontend.common import get_relay_op, infer_shape, infer_type
@@ -16,15 +16,15 @@ from tvm.relay.frontend.common import get_relay_op, infer_shape, infer_type
 # Base methods
 
 
-def dimension_picker(prefix, kernel_shape, suffix=''):
+def dimension_picker(prefix, kernel_shape, suffix=""):
     """
-    Returns the correct name for nth dimensional operator. Uses the 'kernel_shape' attribute.\n
+    Returns the correct name for nth dimensional operator. Uses the "kernel_shape" attribute.\n
     E.g.call: dimension_picker(op_name)(attr)
 
     :param prefix: the name of the operator (e.g. conv)
     :param kernel_shape: shape of the tensor to fit the operation
     :param suffix: optional suffix for ops
-    :return: 'prefix`n`d' where n is the correct dimension for the kernel
+    :return: "prefix`n`d" where n is the correct dimension for the kernel
     """
 
     rank = len(kernel_shape[2:])
@@ -45,23 +45,28 @@ def _size_conv(size, rank):
         if len(size) == 1:
             return size
         if len(size) == 3:
-            assert size[0] == 1 and size[1] == 1, 'Incorrect window dimensions, first two dimensions must be 1'
+            assert (
+                size[0] == 1 and size[1] == 1
+            ), "Incorrect window dimensions, first two dimensions must be 1"
             return size[2]
     if rank == 4:
         if len(size) == 2:
             return size
         if len(size) == 4:
-            assert size[0] == 1 and size[1] == 1, 'Incorrect window dimensions, first two dimensions must be 1'
+            assert (
+                size[0] == 1 and size[1] == 1
+            ), "Incorrect window dimensions, first two dimensions must be 1"
             return size[2:]
     if rank == 5:
         if len(size) == 3:
             return size
         if len(size) == 5:
-            assert size[0] == 1 and size[1] == 1, 'Incorrect window dimensions, first two dimensions must be 1'
+            assert (
+                size[0] == 1 and size[1] == 1
+            ), "Incorrect window dimensions, first two dimensions must be 1"
             return size[2:]
 
-    else:
-        raise ValueError(f'Unexpected window size, got {len(size)}')
+    raise ValueError(f"Unexpected window size, got {len(size)}")
 
 
 def _stride_conv(stride, rank):
@@ -71,7 +76,9 @@ def _stride_conv(stride, rank):
             return stride
         # {pool style} :: [N, C, s] -> asrt N,C == 1; [s]
         if len(stride) == 3:
-            assert stride[0] == 1 and stride[1] == 1, 'Not supported stride dimensions, first two dimensions must be 1'
+            assert (
+                stride[0] == 1 and stride[1] == 1
+            ), "Not supported stride dimensions, first two dimensions must be 1"
             return stride[2:]
     if rank == 4:
         # {conv style} :: [sh, sw] -> [sh, sw]
@@ -79,7 +86,9 @@ def _stride_conv(stride, rank):
             return stride
         # {pool style} :: [N, C, sh, sw] -> asrt N,C == 1; [sh, sw]
         if len(stride) == 4:
-            assert stride[0] == 1 and stride[1] == 1, 'Not supported stride dimensions, first two dimensions must be 1'
+            assert (
+                stride[0] == 1 and stride[1] == 1
+            ), "Not supported stride dimensions, first two dimensions must be 1"
             return stride[2:]
     if rank == 5:
         # {conv style} :: [sd, sh, sw] -> [sd, sh, sw]
@@ -87,9 +96,11 @@ def _stride_conv(stride, rank):
             return stride
         # {pool style} :: [N, C, sd, sh, sw] -> asrt N,C == 1; [sd, sh, sw]
         if len(stride) == 5:
-            assert stride[0] == 1 and stride[1] == 1, 'Not supported stride dimensions, first two dimensions must be 1'
+            assert (
+                stride[0] == 1 and stride[1] == 1
+            ), "Not supported stride dimensions, first two dimensions must be 1"
             return stride[2:]
-    raise ValueError(f'Unexpected stride in {rank - 2}D, got {len(stride)}: {stride}')
+    raise ValueError(f"Unexpected stride in {rank - 2}D, got {len(stride)}: {stride}")
 
 
 def _padding_conv(padding, rank, keepdims=False):
@@ -102,8 +113,9 @@ def _padding_conv(padding, rank, keepdims=False):
             if len(padding) == 3:
                 # {pool style} :: [(batch),(channel),(l,r)] -> asrt N,C == 0, (l,r)
                 if not keepdims:
-                    assert padding[0] == (0, 0) and padding[1] == (0, 0), ('Incorrect padding. '
-                                                                           'Padding on C,I dimensions not supported')
+                    assert padding[0] == (0, 0) and padding[1] == (0, 0), (
+                        "Incorrect padding. " "Padding on C,I dimensions not supported"
+                    )
                     return padding[2]
                 # {sliding window style} :: [(batch),(channel),(l,r)] -> [(batch),(channel),(l,r)]
                 else:
@@ -120,8 +132,9 @@ def _padding_conv(padding, rank, keepdims=False):
             if len(padding) == 4:
                 # {pool style} :: [(batch size),(channel),(u,d),(l,r)] -> asrt N,C == 0, (u, l, d, r)
                 if not keepdims:
-                    assert padding[0] == (0, 0) and padding[1] == (0, 0), ('Incorrect padding. '
-                                                                           'Padding on C,I dimensions not supported')
+                    assert padding[0] == (0, 0) and padding[1] == (0, 0), (
+                        "Incorrect padding. " "Padding on C,I dimensions not supported"
+                    )
                     # itertools is faster than LC (slicing)
                     return list(itertools.chain.from_iterable(zip(padding[2], padding[3])))
                 # {sliding window style} :: [(batch),(channel),(u,d),(l,r)] -> [(batch),(channel),(u,d),(l,r)]
@@ -139,18 +152,23 @@ def _padding_conv(padding, rank, keepdims=False):
             if len(padding) == 5:
                 # {pool style} :: [(batch size),(channel),(f,b)(u,p),(l,r)] -> asrt N,C == 0, (f, u, l, b, d, r)
                 if not keepdims:
-                    assert padding[0] == (0, 0) and padding[1] == (0, 0), ('Incorrect padding. '
-                                                                           'Padding on C,I dimensions not supported')
+                    assert padding[0] == (0, 0) and padding[1] == (0, 0), (
+                        "Incorrect padding. " "Padding on C,I dimensions not supported"
+                    )
                     # itertools faster barely
-                    return list(itertools.chain.from_iterable(zip(padding[2], padding[3], padding[4])))
+                    return list(
+                        itertools.chain.from_iterable(zip(padding[2], padding[3], padding[4]))
+                    )
                 # {s-w style} :: [(batch),(channel),(f,b),(u,d),(l,r)] -> [(batch),(channel),(f,b),(u,d),(l,r)]
                 else:
                     return padding
 
-        raise ValueError(f'Incorrect padding style for {rank - 2}D operand. Only length of {rank - 2}, {rank} '
-                         f'supported, got {len(padding)}: {padding}')
+        raise ValueError(
+            f"Incorrect padding style for {rank - 2}D operand. Only length of {rank - 2}, {rank} "
+            f"supported, got {len(padding)}: {padding}"
+        )
 
-    raise ValueError('nnef should not have singular padding')
+    raise ValueError("nnef should not have singular padding")
 
 
 def _calculate_nnef_padding(active_shape, strides, kernel_shape, dilation):
@@ -161,7 +179,10 @@ def _calculate_nnef_padding(active_shape, strides, kernel_shape, dilation):
     # dilation is the dilations over the active dimensions
     output = [(ui + (s - 1)) // s for ui, s in zip(active_shape, strides)]
     dilated = [(f - 1) * d + 1 for f, d in zip(kernel_shape, dilation)]
-    total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(output, strides, dilated, active_shape)]
+    total = [
+        max(0, (di - 1) * s + df - ui)
+        for di, s, df, ui in zip(output, strides, dilated, active_shape)
+    ]
     padding = [(pad // 2, (pad + 1) // 2) for pad in total]
     return padding
 
@@ -169,145 +190,149 @@ def _calculate_nnef_padding(active_shape, strides, kernel_shape, dilation):
 def _calculate_nnef_padding_deconv(data_sh, strides, kernel_active_sh, dilation, output_shape):
     out_sh = output_shape[2:] if output_shape else [ui * s for ui, s in zip(data_sh, strides)]
     dilated = [(f - 1) * d + 1 for f, d in zip(kernel_active_sh[2:], dilation)]
-    total = [max(0, (di - 1) * s + df - ui) for di, s, df, ui in
-             zip(data_sh, strides, dilated, out_sh)]
+    total = [
+        max(0, (di - 1) * s + df - ui) for di, s, df, ui in zip(data_sh, strides, dilated, out_sh)
+    ]
     return total, out_sh
 
 
 def __unexpected_attrs(op, kwargs):
-    print(f'{op} received unexpected attributes(s), possibly mismatched versions. Attributes(s) ignored:')
+    print(
+        f"{op} received unexpected attributes(s), possibly mismatched versions. Attributes(s) ignored:"
+    )
     for k, v in kwargs.items():
-        print(f'\t{k} := {v}')
+        print(f"\t{k} := {v}")
 
 
 # Conversion map, operator functions
 
+
 def _get_converter_map():
     return {  # Unary
-        'copy': copy_converter,  # arithmetic
-        'neg': neg_converter,
-        'rcp': rcp_converter,
-        'exp': exp_converter,
-        'log': log_converter,
-        'sin': sin_converter,
-        'cos': cos_converter,
-        'tan': tan_converter,
-        'sinh': sinh_converter,
-        'cosh': cosh_converter,
-        'tanh': tanh_converter,
-        'asin': asin_converter,
-        'acos': acos_converter,
-        'atan': atan_converter,
-        'asinh': asinh_converter,
-        'acosh': acosh_converter,
-        'atanh': atanh_converter,
-        'abs': abs_converter,
-        'sign': sign_converter,
-        'not': not_converter,  # logical
-        'floor': floor_converter,  # rounding
-        'ceil': ceil_converter,
-        'round': round_converter,
+        "copy": copy_converter,  # arithmetic
+        "neg": neg_converter,
+        "rcp": rcp_converter,
+        "exp": exp_converter,
+        "log": log_converter,
+        "sin": sin_converter,
+        "cos": cos_converter,
+        "tan": tan_converter,
+        "sinh": sinh_converter,
+        "cosh": cosh_converter,
+        "tanh": tanh_converter,
+        "asin": asin_converter,
+        "acos": acos_converter,
+        "atan": atan_converter,
+        "asinh": asinh_converter,
+        "acosh": acosh_converter,
+        "atanh": atanh_converter,
+        "abs": abs_converter,
+        "sign": sign_converter,
+        "not": not_converter,  # logical
+        "floor": floor_converter,  # rounding
+        "ceil": ceil_converter,
+        "round": round_converter,
         # Binary
-        'add': add_converter,  # arithmetic
-        'sub': sub_converter,
-        'mul': mul_converter,
-        'div': div_converter,
-        'pow': pow_converter,
-        'lt': lt_converter,  # comparison
-        'gt': gt_converter,
-        'le': le_converter,
-        'ge': ge_converter,
-        'eq': eq_converter,
-        'ne': ne_converter,
-        'and': and_converter,  # logical
-        'or': or_converter,
+        "add": add_converter,  # arithmetic
+        "sub": sub_converter,
+        "mul": mul_converter,
+        "div": div_converter,
+        "pow": pow_converter,
+        "lt": lt_converter,  # comparison
+        "gt": gt_converter,
+        "le": le_converter,
+        "ge": ge_converter,
+        "eq": eq_converter,
+        "ne": ne_converter,
+        "and": and_converter,  # logical
+        "or": or_converter,
         # select
-        'select': select_converter,
+        "select": select_converter,
         # simplifier
-        'sqr': sqr_converter,
-        'sqrt': sqrt_converter,
-        'rsqr': rsqr_converter,
-        'rsqrt': rsqrt_converter,
-        'log2': log2_converter,
-        'min': min_converter,
-        'max': max_converter,
-        'clamp': clamp_converter,
+        "sqr": sqr_converter,
+        "sqrt": sqrt_converter,
+        "rsqr": rsqr_converter,
+        "rsqrt": rsqrt_converter,
+        "log2": log2_converter,
+        "min": min_converter,
+        "max": max_converter,
+        "clamp": clamp_converter,
         # sliding-window
-        'conv': conv_converter,
-        'deconv': deconv_converter,
-        'box': box_converter,
-        'debox': debox_converter,
-        'argmax_pool': ndop,
-        'sample': ndop,
-        'desample': ndop,
-        'nearest_downsample': nearest_downsample_converter,
-        'area_downsample': area_downsample_converter,
-        'nearest_upsample': nearest_upsample_converter,
-        'multilinear_upsample': multilinear_upsample_converter,
+        "conv": conv_converter,
+        "deconv": deconv_converter,
+        "box": box_converter,
+        "debox": debox_converter,
+        "argmax_pool": ndop,
+        "sample": ndop,
+        "desample": ndop,
+        "nearest_downsample": nearest_downsample_converter,
+        "area_downsample": area_downsample_converter,
+        "nearest_upsample": nearest_upsample_converter,
+        "multilinear_upsample": multilinear_upsample_converter,
         # reduce
-        'sum_reduce': sum_reduce_converter,
-        'max_reduce': max_reduce_converter,
-        'min_reduce': min_reduce_converter,
-        'argmax_reduce': argmax_reduce_converter,
-        'argmin_reduce': argmin_reduce_converter,
-        'all_reduce': all_reduce_converter,
-        'any_reduce': any_reduce_converter,
-        'mean_reduce': mean_reduce_converter,
+        "sum_reduce": sum_reduce_converter,
+        "max_reduce": max_reduce_converter,
+        "min_reduce": min_reduce_converter,
+        "argmax_reduce": argmax_reduce_converter,
+        "argmin_reduce": argmin_reduce_converter,
+        "all_reduce": all_reduce_converter,
+        "any_reduce": any_reduce_converter,
+        "mean_reduce": mean_reduce_converter,
         # tensor shape
-        'reshape': reshape_converter,
-        'squeeze': squeeze_converter,
-        'unsqueeze': unsqueeze_converter,
-        'transpose': transpose_converter,
-        'split': split_converter,
-        'concat': concat_converter,
-        'stack': stack_converter,
-        'unstack': unstack_converter,
-        'slice': slice_converter,
-        'pad': pad_converter,
-        'tile': tile_converter,
+        "reshape": reshape_converter,
+        "squeeze": squeeze_converter,
+        "unsqueeze": unsqueeze_converter,
+        "transpose": transpose_converter,
+        "split": split_converter,
+        "concat": concat_converter,
+        "stack": stack_converter,
+        "unstack": unstack_converter,
+        "slice": slice_converter,
+        "pad": pad_converter,
+        "tile": tile_converter,
         # region-of-interest - not needed - not supported
-        'avg_roi_pool': ndop,
-        'max_roi_pool': ndop,
-        'roi_resample': ndop,
-        'avg_roi_align': ndop,
-        'max_roi_align': ndop,
+        "avg_roi_pool": ndop,
+        "max_roi_pool": ndop,
+        "roi_resample": ndop,
+        "avg_roi_align": ndop,
+        "max_roi_align": ndop,
         # matrix multiplication
-        'matmul': matmul_converter,
+        "matmul": matmul_converter,
         # variables
-        'update': ndop,  # --- not used
+        "update": ndop,  # --- not used
         # Compound
-        'sigmoid': sigmoid_converter,  # activation
-        'relu': relu_converter,
-        'prelu': prelu_converter,
-        'leaky_relu': leaky_relu_converter,
-        'elu': elu_converter,
-        'selu': selu_converter,
-        'gelu': gelu_converter,
-        'silu': silu_converter,
-        'softmax': softmax_converter,
-        'softplus': softplus_converter,
-        'linear': linear_converter,  # linear
-        'separable_conv': separable_conv_converter,
-        'separable_deconv': separable_deconv_converter,
-        'max_pool_with_index': ndop,  # pooling
-        'max_pool': max_pool_converter,
-        'avg_pool': avg_pool_converter,
-        'rms_pool': rms_pool,
-        'local_response_normalization': local_response_normalization_converter,  # normalization
-        'local_mean_normalization': local_mean_normalization_converter,
-        'local_variance_normalization': local_variance_normalization_converter,
-        'local_contrast_normalization': local_contrast_normalization_converter,
-        'l1_normalization': l1_normalization_converter,
-        'l2_normalization': l2_normalization_converter,
-        'batch_normalization': batch_normalization_converter,
-        'min_max_linear_quantize': ndop,  # quantization
-        'zero_point_linear_quantize': ndop,
-        'linear_quantize': ndop,
-        'logarithmic_quantize': ndop,
+        "sigmoid": sigmoid_converter,  # activation
+        "relu": relu_converter,
+        "prelu": prelu_converter,
+        "leaky_relu": leaky_relu_converter,
+        "elu": elu_converter,
+        "selu": selu_converter,
+        "gelu": gelu_converter,
+        "silu": silu_converter,
+        "softmax": softmax_converter,
+        "softplus": softplus_converter,
+        "linear": linear_converter,  # linear
+        "separable_conv": separable_conv_converter,
+        "separable_deconv": separable_deconv_converter,
+        "max_pool_with_index": ndop,  # pooling
+        "max_pool": max_pool_converter,
+        "avg_pool": avg_pool_converter,
+        "rms_pool": rms_pool,
+        "local_response_normalization": local_response_normalization_converter,  # normalization
+        "local_mean_normalization": local_mean_normalization_converter,
+        "local_variance_normalization": local_variance_normalization_converter,
+        "local_contrast_normalization": local_contrast_normalization_converter,
+        "l1_normalization": l1_normalization_converter,
+        "l2_normalization": l2_normalization_converter,
+        "batch_normalization": batch_normalization_converter,
+        "min_max_linear_quantize": ndop,  # quantization
+        "zero_point_linear_quantize": ndop,
+        "linear_quantize": ndop,
+        "logarithmic_quantize": ndop,
         # MISC
-        'copy_n': ndop,
-        'add_n': ndop,
-        'moments': ndop,
+        "copy_n": ndop,
+        "add_n": ndop,
+        "moments": ndop,
     }
 
 
@@ -315,34 +340,35 @@ def _get_converter_map():
 # TODO maybe should be replaced by independent not impl errors?
 def ndop(*args, **kwargs):
     # print(args, kwargs)
-    raise Exception('Not supported operator was called, please check for compatilibty')
+    raise Exception("Not supported operator was called, please check for compatilibty")
 
 
 #   # Unary ops
 
 
-def copy_converter(data,
-                   **kwargs):
+def copy_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('copy', kwargs)
+        __unexpected_attrs("copy", kwargs)
 
-    return get_relay_op('copy')(data)
+    return get_relay_op("copy")(data)
+
+
 # ok
 
 
-def neg_converter(data,
-                  **kwargs):
+def neg_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('neg', kwargs)
+        __unexpected_attrs("neg", kwargs)
 
-    return get_relay_op('negative')(data)
+    return get_relay_op("negative")(data)
+
+
 # ok
 
 
-def rcp_converter(data,
-                  **kwargs):
+def rcp_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('rcp', kwargs)
+        __unexpected_attrs("rcp", kwargs)
 
     if isinstance(data, relay.Call):
         d_type = infer_type(data).checked_type.dtype
@@ -350,433 +376,472 @@ def rcp_converter(data,
         d_type = data.type_annotation.dtype
 
     return div_converter(tvm_expr.const(1, dtype=d_type), data)
+
+
 # ok
 
 
-def exp_converter(data,
-                  **kwargs):
+def exp_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('exp', kwargs)
+        __unexpected_attrs("exp", kwargs)
 
-    return get_relay_op('exp')(data)
+    return get_relay_op("exp")(data)
+
+
 # ok
 
 
-def log_converter(data,
-                  **kwargs):
+def log_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('log', kwargs)
+        __unexpected_attrs("log", kwargs)
 
-    return get_relay_op('log')(data)
+    return get_relay_op("log")(data)
+
+
 # ok
 
 
-def sin_converter(data,
-                  **kwargs):
+def sin_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('sin', kwargs)
+        __unexpected_attrs("sin", kwargs)
 
-    return get_relay_op('sin')(data)
+    return get_relay_op("sin")(data)
+
+
 # ok
 
 
-def cos_converter(data,
-                  **kwargs):
+def cos_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('cos', kwargs)
+        __unexpected_attrs("cos", kwargs)
 
-    return get_relay_op('cos')(data)
+    return get_relay_op("cos")(data)
+
+
 # ok
 
 
-def tan_converter(data,
-                  **kwargs):
+def tan_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('tan', kwargs)
+        __unexpected_attrs("tan", kwargs)
 
-    return get_relay_op('tan')(data)
+    return get_relay_op("tan")(data)
+
+
 # ok
 
 
-def sinh_converter(data,
-                   **kwargs):
+def sinh_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('sinh', kwargs)
+        __unexpected_attrs("sinh", kwargs)
 
-    return get_relay_op('sinh')(data)
+    return get_relay_op("sinh")(data)
+
+
 # ok
 
 
-def cosh_converter(data,
-                   **kwargs):
+def cosh_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('cosh', kwargs)
+        __unexpected_attrs("cosh", kwargs)
 
-    return get_relay_op('cosh')(data)
+    return get_relay_op("cosh")(data)
+
+
 # ok
 
 
-def tanh_converter(data,
-                   **kwargs):
+def tanh_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('tanh', kwargs)
+        __unexpected_attrs("tanh", kwargs)
 
-    return get_relay_op('tanh')(data)
+    return get_relay_op("tanh")(data)
+
+
 # ok
 
 
-def asin_converter(data,
-                   **kwargs):
+def asin_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('asin', kwargs)
+        __unexpected_attrs("asin", kwargs)
 
-    return get_relay_op('asin')(data)
+    return get_relay_op("asin")(data)
+
+
 # ok
 
 
-def acos_converter(data,
-                   **kwargs):
+def acos_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('acos', kwargs)
+        __unexpected_attrs("acos", kwargs)
 
-    return get_relay_op('acos')(data)
+    return get_relay_op("acos")(data)
+
+
 # ok
 
 
-def atan_converter(data,
-                   **kwargs):
+def atan_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('atan', kwargs)
+        __unexpected_attrs("atan", kwargs)
 
-    return get_relay_op('atan')(data)
+    return get_relay_op("atan")(data)
+
+
 # ok
 
 
-def asinh_converter(data,
-                    **kwargs):
+def asinh_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('asinh', kwargs)
+        __unexpected_attrs("asinh", kwargs)
 
-    return get_relay_op('asinh')(data)
+    return get_relay_op("asinh")(data)
+
+
 # ok
 
 
-def acosh_converter(data,
-                    **kwargs):
+def acosh_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('acosh', kwargs)
+        __unexpected_attrs("acosh", kwargs)
 
-    return get_relay_op('acosh')(data)
+    return get_relay_op("acosh")(data)
+
+
 # ok
 
 
-def atanh_converter(data,
-                    **kwargs):
+def atanh_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('atanh', kwargs)
+        __unexpected_attrs("atanh", kwargs)
 
-    return get_relay_op('atanh')(data)
+    return get_relay_op("atanh")(data)
+
+
 # ok
 
 
-def abs_converter(data,
-                  **kwargs):
+def abs_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('abs', kwargs)
+        __unexpected_attrs("abs", kwargs)
 
-    return get_relay_op('abs')(data)
+    return get_relay_op("abs")(data)
+
+
 # ok
 
 
-def sign_converter(data,
-                   **kwargs):
+def sign_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('sign', kwargs)
+        __unexpected_attrs("sign", kwargs)
 
-    return get_relay_op('sign')(data)
+    return get_relay_op("sign")(data)
+
+
 # ok
 
 
-def not_converter(data,
-                  **kwargs):
+def not_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('not', kwargs)
+        __unexpected_attrs("not", kwargs)
 
-    return get_relay_op('logical_not')(data)
+    return get_relay_op("logical_not")(data)
+
+
 # ok
 
 
-def floor_converter(data,
-                    **kwargs):
+def floor_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('floor', kwargs)
+        __unexpected_attrs("floor", kwargs)
 
-    return get_relay_op('floor')(data)
+    return get_relay_op("floor")(data)
+
+
 # ok
 
 
-def ceil_converter(data,
-                   **kwargs):
+def ceil_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('ceil', kwargs)
+        __unexpected_attrs("ceil", kwargs)
 
-    return get_relay_op('ceil')(data)
+    return get_relay_op("ceil")(data)
+
+
 # ok
 
 
-def round_converter(data,
-                    **kwargs):
+def round_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('round', kwargs)
+        __unexpected_attrs("round", kwargs)
 
-    return get_relay_op('round')(data)
+    return get_relay_op("round")(data)
+
+
 # ok
 
 
 #   # Binary ops
 
-def add_converter(lhs, rhs,
-                  **kwargs):
-    if kwargs:
-        __unexpected_attrs('add', kwargs)
 
-    return get_relay_op('add')(lhs, rhs)
+def add_converter(lhs, rhs, **kwargs):
+    if kwargs:
+        __unexpected_attrs("add", kwargs)
+
+    return get_relay_op("add")(lhs, rhs)
+
+
 # ok
 
 
-def sub_converter(lhs, rhs,
-                  **kwargs):
+def sub_converter(lhs, rhs, **kwargs):
     if kwargs:
-        __unexpected_attrs('sub', kwargs)
+        __unexpected_attrs("sub", kwargs)
 
-    return get_relay_op('subtract')(lhs, rhs)
+    return get_relay_op("subtract")(lhs, rhs)
+
+
 # ok
 
 
-def mul_converter(lhs, rhs,
-                  **kwargs):
+def mul_converter(lhs, rhs, **kwargs):
     if kwargs:
-        __unexpected_attrs('mul', kwargs)
+        __unexpected_attrs("mul", kwargs)
 
-    return get_relay_op('multiply')(lhs, rhs)
+    return get_relay_op("multiply")(lhs, rhs)
+
+
 # ok
 
 
-def div_converter(lhs, rhs,
-                  **kwargs):
+def div_converter(lhs, rhs, **kwargs):
     if kwargs:
-        __unexpected_attrs('div', kwargs)
+        __unexpected_attrs("div", kwargs)
 
-    return get_relay_op('divide')(lhs, rhs)
+    return get_relay_op("divide")(lhs, rhs)
+
+
 # ok
 
 
-def pow_converter(lhs, rhs,
-                  **kwargs):
+def pow_converter(lhs, rhs, **kwargs):
     if kwargs:
-        __unexpected_attrs('pow', kwargs)
+        __unexpected_attrs("pow", kwargs)
 
-    return get_relay_op('power')(lhs, rhs)
+    return get_relay_op("power")(lhs, rhs)
+
+
 # ok
 
 
-def lt_converter(lhs, rhs,
-                 **kwargs):
+def lt_converter(lhs, rhs, **kwargs):
     if kwargs:
-        __unexpected_attrs('lt', kwargs)
+        __unexpected_attrs("lt", kwargs)
 
-    return get_relay_op('less')(lhs, rhs)
+    return get_relay_op("less")(lhs, rhs)
+
+
 # ok
 
 
-def gt_converter(lhs, rhs,
-                 **kwargs):
+def gt_converter(lhs, rhs, **kwargs):
     if kwargs:
-        __unexpected_attrs('gt', kwargs)
+        __unexpected_attrs("gt", kwargs)
 
-    return get_relay_op('greater')(lhs, rhs)
+    return get_relay_op("greater")(lhs, rhs)
+
+
 # ok
 
 
-def le_converter(lhs, rhs,
-                 **kwargs):
+def le_converter(lhs, rhs, **kwargs):
     if kwargs:
-        __unexpected_attrs('le', kwargs)
+        __unexpected_attrs("le", kwargs)
 
-    return get_relay_op('less_equal')(lhs, rhs)
+    return get_relay_op("less_equal")(lhs, rhs)
+
+
 # ok
 
 
-def ge_converter(lhs, rhs,
-                 **kwargs):
+def ge_converter(lhs, rhs, **kwargs):
     if kwargs:
-        __unexpected_attrs('ge', kwargs)
+        __unexpected_attrs("ge", kwargs)
 
-    return get_relay_op('greater_equal')(lhs, rhs)
+    return get_relay_op("greater_equal")(lhs, rhs)
+
+
 # ok
 
 
-def eq_converter(lhs, rhs,
-                 **kwargs):
+def eq_converter(lhs, rhs, **kwargs):
     if kwargs:
-        __unexpected_attrs('eq', kwargs)
+        __unexpected_attrs("eq", kwargs)
 
-    return get_relay_op('equal')(lhs, rhs)
+    return get_relay_op("equal")(lhs, rhs)
+
+
 # ok
 
 
-def ne_converter(lhs, rhs,
-                 **kwargs):
+def ne_converter(lhs, rhs, **kwargs):
     if kwargs:
-        __unexpected_attrs('ne', kwargs)
+        __unexpected_attrs("ne", kwargs)
 
-    return get_relay_op('not_equal')(lhs, rhs)
+    return get_relay_op("not_equal")(lhs, rhs)
+
+
 # ok
 
 
-def and_converter(lhs, rhs,
-                  **kwargs):
+def and_converter(lhs, rhs, **kwargs):
     if kwargs:
-        __unexpected_attrs('and', kwargs)
+        __unexpected_attrs("and", kwargs)
 
-    return get_relay_op('logical_and')(lhs, rhs)
+    return get_relay_op("logical_and")(lhs, rhs)
+
+
 # ok
 
 
-def or_converter(lhs, rhs,
-                 **kwargs):
+def or_converter(lhs, rhs, **kwargs):
     if kwargs:
-        __unexpected_attrs('or', kwargs)
+        __unexpected_attrs("or", kwargs)
 
-    return get_relay_op('logical_or')(lhs, rhs)
+    return get_relay_op("logical_or")(lhs, rhs)
+
+
 # ok
 
 
 #   # Select op
 
-def select_converter(condition, t_val, f_val,
-                     **kwargs):
-    if kwargs:
-        __unexpected_attrs('select', kwargs)
 
-    return get_relay_op('where')(condition, t_val, f_val)
+def select_converter(condition, t_val, f_val, **kwargs):
+    if kwargs:
+        __unexpected_attrs("select", kwargs)
+
+    return get_relay_op("where")(condition, t_val, f_val)
+
+
 # ok
 
 
 #   # Simplifier ops
 
-def sqr_converter(data,
-                  **kwargs):
+
+def sqr_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('sqr', kwargs)
+        __unexpected_attrs("sqr", kwargs)
 
     if isinstance(data, relay.Call):
         d_type = infer_type(data).checked_type.dtype
     else:
         d_type = data.type_annotation.dtype
 
-    return get_relay_op('power')(data, tvm_expr.const(2.0, dtype=d_type))
+    return get_relay_op("power")(data, tvm_expr.const(2.0, dtype=d_type))
+
+
 # ok
 
 
-def sqrt_converter(data,
-                   **kwargs):
+def sqrt_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('sqrt', kwargs)
+        __unexpected_attrs("sqrt", kwargs)
 
-    return get_relay_op('sqrt')(data)
+    return get_relay_op("sqrt")(data)
+
+
 # ok
 
 
-def rsqr_converter(data,
-                   **kwargs):
+def rsqr_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('rsqr', kwargs)
+        __unexpected_attrs("rsqr", kwargs)
 
     if isinstance(data, relay.Call):
         d_type = infer_type(data).checked_type.dtype
     else:
         d_type = data.type_annotation.dtype
 
-    return get_relay_op('power')(data, tvm_expr.const(-2.0, dtype=d_type))
+    return get_relay_op("power")(data, tvm_expr.const(-2.0, dtype=d_type))
+
+
 # ok
 
 
-def rsqrt_converter(data,
-                    **kwargs):
+def rsqrt_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('rsqrt', kwargs)
+        __unexpected_attrs("rsqrt", kwargs)
 
-    return get_relay_op('rsqrt')(data)
+    return get_relay_op("rsqrt")(data)
+
+
 # ok
 
 
-def log2_converter(data,
-                   **kwargs):
+def log2_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('log2', kwargs)
+        __unexpected_attrs("log2", kwargs)
 
-    return get_relay_op('log2')(data)
+    return get_relay_op("log2")(data)
+
+
 # ok
 
 
-def min_converter(lhs, rhs,
-                  **kwargs):
+def min_converter(lhs, rhs, **kwargs):
     if kwargs:
-        __unexpected_attrs('min', kwargs)
+        __unexpected_attrs("min", kwargs)
 
-    return get_relay_op('minimum')(lhs, rhs)
+    return get_relay_op("minimum")(lhs, rhs)
+
+
 # ok
 
 
-def max_converter(lhs, rhs,
-                  **kwargs):
+def max_converter(lhs, rhs, **kwargs):
     if kwargs:
-        __unexpected_attrs('max', kwargs)
+        __unexpected_attrs("max", kwargs)
 
-    return get_relay_op('maximum')(lhs, rhs)
+    return get_relay_op("maximum")(lhs, rhs)
+
+
 # ok
 
 
-def clamp_converter(x, a, b,
-                    **kwargs):
+def clamp_converter(x, a, b, **kwargs):
     if kwargs:
-        __unexpected_attrs('clamp', kwargs)
+        __unexpected_attrs("clamp", kwargs)
 
     # only works if b and a are Constant floats, not tensors
     if isinstance(a, tvm_expr.Constant) and isinstance(b, tvm_expr.Constant):
-        return get_relay_op('clip')(x, float(a.data.numpy()), float(b.data.numpy()))
+        return get_relay_op("clip")(x, float(a.data.numpy()), float(b.data.numpy()))
 
     return max_converter(min_converter(x, b), a)
+
+
 # ok
 
 
 #   # Sliding-window ops
 
 
-def conv_converter(data,
-                   kernel,
-                   bias,
-                   border,
-                   stride,
-                   padding,
-                   dilation,
-                   groups,
-                   **kwargs):
+def conv_converter(data, kernel, bias, border, stride, padding, dilation, groups, **kwargs):
+    """Convolution converter,
+    skips bias if it's 0.0 (no bias)"""
     if kwargs:
-        __unexpected_attrs('conv', kwargs)
+        __unexpected_attrs("conv", kwargs)
 
-    if border != 'constant':
-        print(f'Currently {border} border is not supported, used `constant` border')
+    if border != "constant":
+        print(f"Currently {border} border is not supported, used `constant` border")
 
     kernel_shape = infer_shape(kernel)
     dshape = infer_shape(data)
 
-    strides = _stride_conv(stride, len(kernel_shape)) if stride \
-        else (1,) * (len(kernel_shape) - 2)
+    strides = _stride_conv(stride, len(kernel_shape)) if stride else (1,) * (len(kernel_shape) - 2)
 
-    dilation = dilation if dilation else (
-            (1,) * (len(kernel_shape) - 2))
+    dilation = dilation if dilation else ((1,) * (len(kernel_shape) - 2))
 
     if not padding:
         padding = _calculate_nnef_padding(dshape[2:], strides, kernel_shape[2:], dilation)
@@ -788,7 +853,7 @@ def conv_converter(data,
     if groups == 0:
         groups = channels
 
-    op = get_relay_op(dimension_picker('conv', kernel_shape))
+    op = get_relay_op(dimension_picker("conv", kernel_shape))
     conv_out = op(
         data=data,
         weight=kernel,
@@ -811,36 +876,33 @@ def conv_converter(data,
         res = tvm_op.nn.bias_add(conv_out, relay.squeeze(bias, axis=0))
 
     return res
+
+
 # ok
 
 
-def deconv_converter(data,
-                     kernel,
-                     bias,
-                     border,
-                     stride,
-                     padding,
-                     dilation,
-                     output_shape,
-                     groups,
-                     **kwargs):
+def deconv_converter(
+    data, kernel, bias, border, stride, padding, dilation, output_shape, groups, **kwargs
+):
+    """Deconvolution converter, using convxd_transpose
+    skips bias if it's 0.0 (no bias)"""
     if kwargs:
-        __unexpected_attrs('deconv', kwargs)
+        __unexpected_attrs("deconv", kwargs)
 
-    if border != 'constant':
-        print(f'Currently {border} border is not supported, used `constant` border')
+    if border != "constant":
+        print(f"Currently {border} border is not supported, used `constant` border")
 
     kernel_shape = infer_shape(kernel)
 
     rank = len(kernel_shape)
 
-    strides = _stride_conv(stride, rank) if stride \
-        else (1,) * (rank - 2)
+    strides = _stride_conv(stride, rank) if stride else (1,) * (rank - 2)
 
-    dilation = dilation if dilation else (
-            (1,) * (rank - 2))
+    dilation = dilation if dilation else ((1,) * (rank - 2))
 
-    total, out_sh = _calculate_nnef_padding_deconv(infer_shape(data), strides, kernel_shape, dilation, output_shape)
+    total, out_sh = _calculate_nnef_padding_deconv(
+        infer_shape(data), strides, kernel_shape, dilation, output_shape
+    )
 
     if padding:
         pad = _padding_conv(padding, rank)
@@ -852,11 +914,14 @@ def deconv_converter(data,
     channels = kernel_shape[1] * groups
 
     # limit output padding to modulo stride because of tvm checks
-    out_pad = [(x - (y - t)) % s for x, y, t, s in zip(output_shape[2:], out_sh, total, stride)] if output_shape \
+    out_pad = (
+        [(x - (y - t)) % s for x, y, t, s in zip(output_shape[2:], out_sh, total, stride)]
+        if output_shape
         else (0, 0)
+    )
     # todo test if that can be larger for nnef?
 
-    op = get_relay_op(dimension_picker('conv', kernel_shape, suffix='_transpose'))
+    op = get_relay_op(dimension_picker("conv", kernel_shape, suffix="_transpose"))
     deconv_out = op(
         data=data,
         weight=kernel,
@@ -879,19 +944,16 @@ def deconv_converter(data,
         res = tvm_op.nn.bias_add(deconv_out, relay.squeeze(bias, axis=0))
 
     return res
+
+
 # ok
 
 
-def box_converter(data,
-                  size,
-                  border,
-                  padding,
-                  stride,
-                  dilation,
-                  normalize,
-                  **kwargs):
+def box_converter(data, size, border, padding, stride, dilation, normalize, **kwargs):
+    """Box operator converter,
+    summation over sliding window, equal to conv with constant filter"""
     if kwargs:
-        __unexpected_attrs('box', kwargs)
+        __unexpected_attrs("box", kwargs)
 
     dshape = infer_shape(data)
 
@@ -906,29 +968,22 @@ def box_converter(data,
     else:
         kernel = relay.ones(size, d_type)
 
-    out = conv_converter(data,
-                         kernel,
-                         tvm_expr.const(0, dtype=d_type),
-                         border,
-                         stride,
-                         padding,
-                         dilation,
-                         dshape[1])
+    out = conv_converter(
+        data, kernel, tvm_expr.const(0, dtype=d_type), border, stride, padding, dilation, dshape[1]
+    )
     return out
+
+
 # ok
 
 
-def debox_converter(data,
-                    size,
-                    border,
-                    padding,
-                    stride,
-                    dilation,
-                    normalize,
-                    output_shape,
-                    **kwargs):
+def debox_converter(
+    data, size, border, padding, stride, dilation, normalize, output_shape, **kwargs
+):
+    """Debox operator converter,
+    inverse of box, equal to deconv with constant filter"""
     if kwargs:
-        __unexpected_attrs('debox', kwargs)
+        __unexpected_attrs("debox", kwargs)
 
     dshape = infer_shape(data)
 
@@ -942,99 +997,104 @@ def debox_converter(data,
         kernel = relay.full(tvm_op.const(1 / math.prod(size[2:]), d_type), size, d_type)
     else:
         kernel = relay.ones(size, d_type)
-    out = deconv_converter(data,
-                           kernel,
-                           tvm_expr.const(0, dtype=d_type),
-                           border,
-                           stride,
-                           padding,
-                           dilation,
-                           output_shape,
-                           groups=dshape[1])
+    out = deconv_converter(
+        data,
+        kernel,
+        tvm_expr.const(0, dtype=d_type),
+        border,
+        stride,
+        padding,
+        dilation,
+        output_shape,
+        groups=dshape[1],
+    )
     return out
+
+
 # ok
 
 
-def nearest_downsample_converter(data,
-                                 factor,
-                                 **kwargs):
+def nearest_downsample_converter(data, factor, **kwargs):
     if kwargs:
-        __unexpected_attrs('nearest_downsample', kwargs)
+        __unexpected_attrs("nearest_downsample", kwargs)
 
     dims = 2 + len(factor)
 
-    return box_converter(data,
-                         size=[1] * dims,
-                         border='constant',
-                         padding=[(0, 0)] * dims,
-                         stride=[1, 1] + factor,
-                         dilation=(1,) * (dims - 2),
-                         normalize=False)
+    return box_converter(
+        data,
+        size=[1] * dims,
+        border="constant",
+        padding=[(0, 0)] * dims,
+        stride=[1, 1] + factor,
+        dilation=(1,) * (dims - 2),
+        normalize=False,
+    )
+
+
 # ok
 
 
-def area_downsample_converter(data,
-                              factor,
-                              **kwargs):
+def area_downsample_converter(data, factor, **kwargs):
     if kwargs:
-        __unexpected_attrs('area_downsample', kwargs)
+        __unexpected_attrs("area_downsample", kwargs)
 
     dims = 2 + len(factor)
 
-    return box_converter(data,
-                         size=[1, 1] + factor,
-                         border='constant',
-                         padding=[(0, 0)] * dims,
-                         stride=[1, 1] + factor,
-                         dilation=(1,) * (dims - 2),
-                         normalize=True)
+    return box_converter(
+        data,
+        size=[1, 1] + factor,
+        border="constant",
+        padding=[(0, 0)] * dims,
+        stride=[1, 1] + factor,
+        dilation=(1,) * (dims - 2),
+        normalize=True,
+    )
+
+
 # ok
 
 
-def nearest_upsample_converter(data,
-                               factor,
-                               **kwargs):
+def nearest_upsample_converter(data, factor, **kwargs):
     if kwargs:
-        __unexpected_attrs('nearest_upsample', kwargs)
+        __unexpected_attrs("nearest_upsample", kwargs)
 
     # conversion from nn.upsampling to image.resizexd, re: discuss:11650
     #
     dshape = infer_shape(data)
     new_size = [d * f for d, f in zip(dshape[2:], factor)]
-    return get_relay_op(dimension_picker('resize', dshape))(
+    return get_relay_op(dimension_picker("resize", dshape))(
         data,
         new_size,
-        method='nearest_neighbor',
-        # coordinate_transformation_mode='asymmetric',
-        rounding_method='round', )
+        method="nearest_neighbor",
+        # coordinate_transformation_mode="asymmetric",
+        rounding_method="round",
+    )
+
+
 # ok
 
 
-def multilinear_upsample_converter(data,
-                                   factor,
-                                   method,
-                                   border,
-                                   **kwargs):
+def multilinear_upsample_converter(data, factor, method, border, **kwargs):
     if kwargs:
-        __unexpected_attrs('linear_upsample', kwargs)
+        __unexpected_attrs("linear_upsample", kwargs)
 
     # conversion from nn.upsampling to image.resizexd, re: discuss:11650
     #
     dshape = infer_shape(data)
     new_size = [d * f for d, f in zip(dshape[2:], factor)]
-    if method == 'aligned':
-        return get_relay_op(dimension_picker('resize', dshape))(
+    if method == "aligned":
+        return get_relay_op(dimension_picker("resize", dshape))(
             data,
             new_size,
-            method='linear',
-            coordinate_transformation_mode='align_corners',
+            method="linear",
+            coordinate_transformation_mode="align_corners",
         )
-    if method == 'symmetric' and border == 'replicate':
-        return get_relay_op(dimension_picker('resize', dshape))(
+    if method == "symmetric" and border == "replicate":
+        return get_relay_op(dimension_picker("resize", dshape))(
             data,
             new_size,
-            method='linear',
-            coordinate_transformation_mode='half_pixel',
+            method="linear",
+            coordinate_transformation_mode="half_pixel",
         )
 
     def _upsample_weights_1d(fact, symm):
@@ -1051,7 +1111,7 @@ def multilinear_upsample_converter(data,
 
     n, c = dshape[:2]
 
-    symmetric = method == 'symmetric'
+    symmetric = method == "symmetric"
     weights = _upsample_weights_nd(factor, symmetric)
     weights = np.reshape(weights, newshape=(1, 1) + weights.shape)
     kernel = tile_converter(tvm_expr.const(weights), (c, 1) + (1,) * len(factor))
@@ -1060,166 +1120,161 @@ def multilinear_upsample_converter(data,
     output_shape = [n, c] + [f * s for f, s in zip(factor, dshape[2:])]
 
     if symmetric:
-        return deconv_converter(data,
-                                kernel,
-                                tvm_expr.const(0.0),
-                                border='constant',
-                                stride=factor,
-                                padding=[(f - 1, f - 1) for f in factor],
-                                dilation=[],
-                                groups=c,
-                                output_shape=output_shape,
-                                )
+        return deconv_converter(
+            data,
+            kernel,
+            tvm_expr.const(0.0),
+            border="constant",
+            stride=factor,
+            padding=[(f - 1, f - 1) for f in factor],
+            dilation=[],
+            groups=c,
+            output_shape=output_shape,
+        )
     else:
-        replicate = border == 'replicate'
+        replicate = border == "replicate"
         if replicate:
-            data = pad_converter(data, [(0, 0), (0, 0)] + [(1, 0)] * len(factor), border, tvm_expr.const(0.0))
+            data = pad_converter(
+                data, [(0, 0), (0, 0)] + [(1, 0)] * len(factor), border, tvm_expr.const(0.0)
+            )
             padding = factor
         else:
             padding = [f // 2 for f in factor]
 
-        return deconv_converter(data,
-                                kernel,
-                                tvm_expr.const(0.0),
-                                border='constant',
-                                stride=factor,
-                                padding=[(p, p - 1) for p in padding],
-                                dilation=[],
-                                groups=c,
-                                output_shape=output_shape,
-                                )
+        return deconv_converter(
+            data,
+            kernel,
+            tvm_expr.const(0.0),
+            border="constant",
+            stride=factor,
+            padding=[(p, p - 1) for p in padding],
+            dilation=[],
+            groups=c,
+            output_shape=output_shape,
+        )
+
+
 # ok
 
 
 #   # Reduce ops
 
-def sum_reduce_converter(data,
-                         axes,
-                         normalize,
-                         keepdims=True,
-                         **kwargs):
-    if kwargs:
-        __unexpected_attrs('sum_reduce', kwargs)
 
-    out = get_relay_op('sum')(data, axes, keepdims=keepdims)
+def sum_reduce_converter(data, axes, normalize, keepdims=True, **kwargs):
+    if kwargs:
+        __unexpected_attrs("sum_reduce", kwargs)
+
+    out = get_relay_op("sum")(data, axes, keepdims=keepdims)
     if normalize:
         return l2_normalization_converter(out, 0, [x - 2 for x in axes], 0.0)
     return out
+
+
 # ok
 
 
-def max_reduce_converter(data,
-                         axes,
-                         keepdims=True,
-                         **kwargs):
+def max_reduce_converter(data, axes, keepdims=True, **kwargs):
     if kwargs:
-        __unexpected_attrs('max_reduce', kwargs)
+        __unexpected_attrs("max_reduce", kwargs)
 
-    return get_relay_op('max')(data, axes, keepdims=keepdims)
+    return get_relay_op("max")(data, axes, keepdims=keepdims)
+
+
 # ok
 
 
-def min_reduce_converter(data,
-                         axes,
-                         keepdims=True,
-                         **kwargs):
+def min_reduce_converter(data, axes, keepdims=True, **kwargs):
     if kwargs:
-        __unexpected_attrs('min_reduce', kwargs)
+        __unexpected_attrs("min_reduce", kwargs)
 
-    return get_relay_op('min')(data, axes, keepdims=keepdims)
+    return get_relay_op("min")(data, axes, keepdims=keepdims)
+
+
 # ok
 
 
-def argmax_reduce_converter(data,
-                            axes,
-                            keepdims=True,
-                            **kwargs):
+def argmax_reduce_converter(data, axes, keepdims=True, **kwargs):
     if kwargs:
-        __unexpected_attrs('argmax_reduce', kwargs)
+        __unexpected_attrs("argmax_reduce", kwargs)
 
-    return get_relay_op('argmax')(data, axes, keepdims=keepdims)
+    return get_relay_op("argmax")(data, axes, keepdims=keepdims)
+
+
 # ok
 
 
-def argmin_reduce_converter(data,
-                            axes,
-                            keepdims=True,
-                            **kwargs):
+def argmin_reduce_converter(data, axes, keepdims=True, **kwargs):
     if kwargs:
-        __unexpected_attrs('argmin_reduce', kwargs)
+        __unexpected_attrs("argmin_reduce", kwargs)
 
-    return get_relay_op('argmin')(data, axes, keepdims=keepdims)
+    return get_relay_op("argmin")(data, axes, keepdims=keepdims)
+
+
 # ok
 
 
-def all_reduce_converter(data,
-                         axes,
-                         keepdims=True,
-                         **kwargs):
+def all_reduce_converter(data, axes, keepdims=True, **kwargs):
     if kwargs:
-        __unexpected_attrs('all_reduce', kwargs)
+        __unexpected_attrs("all_reduce", kwargs)
 
-    return get_relay_op('all')(data, axes, keepdims=keepdims)
+    return get_relay_op("all")(data, axes, keepdims=keepdims)
+
+
 # ok
 
 
-def any_reduce_converter(data,
-                         axes,
-                         keepdims=True,
-                         **kwargs):
+def any_reduce_converter(data, axes, keepdims=True, **kwargs):
     if kwargs:
-        __unexpected_attrs('any_reduce', kwargs)
+        __unexpected_attrs("any_reduce", kwargs)
 
-    return get_relay_op('any')(data, axes, keepdims=keepdims)
+    return get_relay_op("any")(data, axes, keepdims=keepdims)
+
+
 # ok
 
 
-def mean_reduce_converter(data,
-                          axes,
-                          keepdims=True,
-                          **kwargs):
+def mean_reduce_converter(data, axes, keepdims=True, **kwargs):
     if kwargs:
-        __unexpected_attrs('mean_reduce', kwargs)
+        __unexpected_attrs("mean_reduce", kwargs)
 
-    return get_relay_op('mean')(data, axes, keepdims=keepdims)
+    return get_relay_op("mean")(data, axes, keepdims=keepdims)
+
+
 # ok
 
 
 #   # Tensor shape ops
 
-def reshape_converter(data,
-                      shape,
-                      axis_start,
-                      axis_count,
-                      **kwargs):
+
+def reshape_converter(data, shape, axis_start, axis_count, **kwargs):
     if kwargs:
-        __unexpected_attrs('reshape', kwargs)
+        __unexpected_attrs("reshape", kwargs)
 
     dshape = list(infer_shape(data))
     if axis_count == -1:
         newshape = dshape[:axis_start] + shape
     else:
         newshape = dshape
-        newshape[axis_start:axis_start + axis_count] = shape
+        newshape[axis_start : axis_start + axis_count] = shape
 
-    return get_relay_op('reshape')(data, newshape)
+    return get_relay_op("reshape")(data, newshape)
+
+
 # ok
 
 
-def squeeze_converter(data,
-                      axes,
-                      **kwargs):
+def squeeze_converter(data, axes, **kwargs):
     if kwargs:
-        __unexpected_attrs('squeeze', kwargs)
+        __unexpected_attrs("squeeze", kwargs)
     return relay.squeeze(data, axes)
+
+
 # ok
 
 
-def unsqueeze_converter(data,
-                        axes,
-                        **kwargs):
+def unsqueeze_converter(data, axes, **kwargs):
     if kwargs:
-        __unexpected_attrs('unsqueeze', kwargs)
+        __unexpected_attrs("unsqueeze", kwargs)
 
     axes = sorted(axes)
     for axis in axes:
@@ -1228,25 +1283,24 @@ def unsqueeze_converter(data,
 
         data = tvm_op.expand_dims(data, axis=axis, num_newaxis=1)
     return data
+
+
 # ok
 
 
-def transpose_converter(data,
-                        axes,
-                        **kwargs):
+def transpose_converter(data, axes, **kwargs):
     if kwargs:
-        __unexpected_attrs('transpose', kwargs)
+        __unexpected_attrs("transpose", kwargs)
 
-    return get_relay_op('transpose')(data, axes)
+    return get_relay_op("transpose")(data, axes)
+
+
 # ok
 
 
-def split_converter(data,
-                    axis,
-                    ratios,
-                    **kwargs):
+def split_converter(data, axis, ratios, **kwargs):
     if kwargs:
-        __unexpected_attrs('split', kwargs)
+        __unexpected_attrs("split", kwargs)
 
     axis_len = infer_shape(data)[axis]
     rat_mul = axis_len / sum(ratios)
@@ -1259,88 +1313,82 @@ def split_converter(data,
         # Strictly needs int
         indices.append(int(s))
 
-    return get_relay_op('split')(data, indices, axis)
+    return get_relay_op("split")(data, indices, axis)
+
+
 # ok
 
 
-def concat_converter(*data,
-                     axis,
-                     **kwargs):
+def concat_converter(*data, axis, **kwargs):
     if kwargs:
-        __unexpected_attrs('concat', kwargs)
+        __unexpected_attrs("concat", kwargs)
 
-    return get_relay_op('concatenate')(data, axis)
+    return get_relay_op("concatenate")(data, axis)
+
+
 # ok
 
 
-def stack_converter(*data,
-                    axis,
-                    **kwargs):
+def stack_converter(*data, axis, **kwargs):
     if kwargs:
-        __unexpected_attrs('stack', kwargs)
+        __unexpected_attrs("stack", kwargs)
 
-    return get_relay_op('stack')(data, axis)
+    return get_relay_op("stack")(data, axis)
+
+
 # ok
 
 
-
-def unstack_converter(data,
-                      axis,
-                      **kwargs):
+def unstack_converter(data, axis, **kwargs):
     if kwargs:
-        __unexpected_attrs('unstack', kwargs)
+        __unexpected_attrs("unstack", kwargs)
 
     split = split_converter(data, axis, [1] * infer_shape(data)[axis])
     res = []
     for i in range(len(split)):
         res.append(squeeze_converter(split[i], axis))
     return tvm_expr.TupleWrapper(relay.Tuple(res), len(res))
+
+
 # ok
 
 
-
-def slice_converter(data,
-                    axes,
-                    begin,
-                    end,
-                    stride,
-                    **kwargs):
+def slice_converter(data, axes, begin, end, stride, **kwargs):
     if kwargs:
-        __unexpected_attrs('slice', kwargs)
+        __unexpected_attrs("slice", kwargs)
 
     if not stride:
         stride = [1] * len(axes)
 
-    return get_relay_op('strided_slice')(data, begin, end, strides=stride, axes=axes)
+    return get_relay_op("strided_slice")(data, begin, end, strides=stride, axes=axes)
+
+
 # ok
 
 
-
-def pad_converter(data,
-                  padding,
-                  border,
-                  value,
-                  **kwargs):
+def pad_converter(data, padding, border, value, **kwargs):
     if kwargs:
-        __unexpected_attrs('pad', kwargs)
+        __unexpected_attrs("pad", kwargs)
 
-    if border not in ['constant', 'replicate', 'reflect']:
-        print(f'{border} border type is not supported in padding. Assumed constant')
-        border = 'constant'
-    if border == 'replicate':
-        border = 'edge'
+    if border not in ["constant", "replicate", "reflect"]:
+        print(f"{border} border type is not supported in padding. Assumed constant")
+        border = "constant"
+    if border == "replicate":
+        border = "edge"
 
-    return get_relay_op('pad')(data, padding, value, border)
+    return get_relay_op("pad")(data, padding, value, border)
+
+
 # ok
 
 
-def tile_converter(data,
-                   repeats,
-                   **kwargs):
+def tile_converter(data, repeats, **kwargs):
     if kwargs:
-        __unexpected_attrs('tile', kwargs)
+        __unexpected_attrs("tile", kwargs)
 
-    return get_relay_op('tile')(data, repeats)
+    return get_relay_op("tile")(data, repeats)
+
+
 # ok
 
 
@@ -1352,7 +1400,7 @@ def tile_converter(data,
 #   # Matrix multiplication
 def matmul_converter(a, b, transposeA, transposeB, **kwargs):
     if kwargs:
-        __unexpected_attrs('matmul', kwargs)
+        __unexpected_attrs("matmul", kwargs)
 
     a_shape = infer_shape(a)
     b_shape = infer_shape(b)
@@ -1360,7 +1408,7 @@ def matmul_converter(a, b, transposeA, transposeB, **kwargs):
     b_rank = len(b_shape)
 
     if a_rank == 2 and b_rank == 2:
-        out = get_relay_op('matmul')(a, b, transpose_a=transposeA, transpose_b=transposeB)
+        out = get_relay_op("matmul")(a, b, transpose_a=transposeA, transpose_b=transposeB)
     else:
         batch_shape = [1] * (max(a_rank, b_rank) - 2)
 
@@ -1380,7 +1428,7 @@ def matmul_converter(a, b, transposeA, transposeB, **kwargs):
         a = tvm_op.broadcast_to(a, batch_shape + list(a_shape[-2:]))
         b = tvm_op.broadcast_to(b, batch_shape + list(b_shape[-2:]))
 
-        out = get_relay_op('batch_matmul')(
+        out = get_relay_op("batch_matmul")(
             tvm_op.reshape(a, [-1, *a_shape[-2:]]),
             tvm_op.reshape(b, [-1, *b_shape[-2:]]),
             transpose_b=transposeB,
@@ -1391,6 +1439,8 @@ def matmul_converter(a, b, transposeA, transposeB, **kwargs):
         out = tvm_op.reshape(out, out_shape)
 
     return out
+
+
 # ok
 
 
@@ -1398,84 +1448,95 @@ def matmul_converter(a, b, transposeA, transposeB, **kwargs):
 #   # Compound ops
 
 
-def sigmoid_converter(data,
-                      **kwargs):
+def sigmoid_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('sigmoid', kwargs)
+        __unexpected_attrs("sigmoid", kwargs)
 
-    return get_relay_op('sigmoid')(data)
+    return get_relay_op("sigmoid")(data)
+
+
 # ok
 
 
-def relu_converter(data,
-                   **kwargs):
+def relu_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('relu', kwargs)
+        __unexpected_attrs("relu", kwargs)
 
-    return get_relay_op('relu')(data)
+    return get_relay_op("relu")(data)
+
+
 # ok
 
 
-def prelu_converter(data,
-                    alpha,
-                    **kwargs):
+def prelu_converter(data, alpha, **kwargs):
     if kwargs:
-        __unexpected_attrs('prelu', kwargs)
+        __unexpected_attrs("prelu", kwargs)
 
-    # prelu can't handle float vals but NNEF supports direct parameter, this is just in case
+    # prelu can"t handle float vals but NNEF supports direct parameter, this is just in case
     if isinstance(alpha, tvm_expr.Constant):
         if alpha.data.numpy().size == 1:
-            return get_relay_op('leaky_relu')(data, alpha.data.numpy().item())
+            return get_relay_op("leaky_relu")(data, alpha.data.numpy().item())
 
-    return get_relay_op('prelu')(data, alpha)
+    return get_relay_op("prelu")(data, alpha)
+
+
 # ok
 
 
-def leaky_relu_converter(data,
-                         alpha,
-                         **kwargs):
+def leaky_relu_converter(data, alpha, **kwargs):
     if kwargs:
-        __unexpected_attrs('leaky_relu', kwargs)
+        __unexpected_attrs("leaky_relu", kwargs)
 
-    return get_relay_op('leaky_relu')(data, alpha)
+    return get_relay_op("leaky_relu")(data, alpha)
+
+
 # ok
 
 
-
-def elu_converter(data,
-                  alpha,
-                  **kwargs):
+def elu_converter(data, alpha, **kwargs):
     if kwargs:
-        __unexpected_attrs('elu', kwargs)
+        __unexpected_attrs("elu", kwargs)
 
-    return select_converter(lt_converter(data, tvm_expr.const(0.0)),
-                            mul_converter(tvm_expr.const(alpha),
-                                          sub_converter(exp_converter(data), tvm_expr.const(1.0))),
-                            data)
+    return select_converter(
+        lt_converter(data, tvm_expr.const(0.0)),
+        mul_converter(
+            tvm_expr.const(alpha), sub_converter(exp_converter(data), tvm_expr.const(1.0))
+        ),
+        data,
+    )
+
+
 # ok
 
 
-
-def selu_converter(data,
-                   alpha,
-                   # lambda,
-                   **kwargs):
+def selu_converter(
+    data,
+    alpha,
+    # lambda,
+    **kwargs,
+):
     """True signature is selu_converter(data, alpha, lambda)"""
-    lambda_var = kwargs.pop('lambda')
+    lambda_var = kwargs.pop("lambda")
 
     if kwargs:
-        __unexpected_attrs('selu', kwargs)
+        __unexpected_attrs("selu", kwargs)
 
-    return mul_converter(tvm_expr.const(lambda_var),
-                         select_converter(data < tvm_expr.const(0.0),
-                                          mul_converter(tvm_expr.const(alpha),
-                                                        sub_converter(exp_converter(data), tvm_expr.const(1.0))),
-                                          data))
+    return mul_converter(
+        tvm_expr.const(lambda_var),
+        select_converter(
+            data < tvm_expr.const(0.0),
+            mul_converter(
+                tvm_expr.const(alpha), sub_converter(exp_converter(data), tvm_expr.const(1.0))
+            ),
+            data,
+        ),
+    )
+
+
 # ok
 
 
-def gelu_converter(data,
-                   **kwargs):
+def gelu_converter(data, **kwargs):
     """
     NNEF definition for GELU:
     the exact definition of GELU is x * Phi(x) where Phi(x) is the
@@ -1487,53 +1548,57 @@ def gelu_converter(data,
     But in this case we will use the erf to calculate normcdf (same as to pytorch GELU impl)
     """
     if kwargs:
-        __unexpected_attrs('gelu', kwargs)
+        __unexpected_attrs("gelu", kwargs)
 
     return data * (
-            tvm_expr.const(0.5)
-            + tvm_op.erf(data * tvm_expr.const(0.5 ** 0.5)) * tvm_expr.const(0.5)
+        tvm_expr.const(0.5) + tvm_op.erf(data * tvm_expr.const(0.5**0.5)) * tvm_expr.const(0.5)
     )
+
+
 # ok
 
-def silu_converter(data,
-                   **kwargs):
+
+def silu_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('silu', kwargs)
+        __unexpected_attrs("silu", kwargs)
 
     return mul_converter(data, sigmoid_converter(data))
+
+
 # ok
 
-def softmax_converter(data,
-                      axes,
-                      **kwargs):
+
+def softmax_converter(data, axes, **kwargs):
     if kwargs:
-        __unexpected_attrs('softmax', kwargs)
+        __unexpected_attrs("softmax", kwargs)
 
     if len(axes) > 1:
-        print('Multiple axes not supported, operation has been done along the first axis in axes.')
+        print("Multiple axes not supported, operation has been done along the first axis in axes.")
     axis = axes[0]
 
-    return get_relay_op('softmax')(data, axis)
+    return get_relay_op("softmax")(data, axis)
+
+
 # ok
 
-def softplus_converter(data,
-                       **kwargs):
+
+def softplus_converter(data, **kwargs):
     if kwargs:
-        __unexpected_attrs('softplus', kwargs)
+        __unexpected_attrs("softplus", kwargs)
 
     return log_converter(add_converter(exp_converter(data), tvm_expr.const(1.0)))
+
+
 # ok
 
 #   # linear ops
 
-def linear_converter(data,
-                     filter,
-                     bias,
-                     **kwargs):
-    if kwargs:
-        __unexpected_attrs('linear', kwargs)
 
-    out = get_relay_op('matmul')(data, filter, transpose_b=True)
+def linear_converter(data, filter, bias, **kwargs):
+    if kwargs:
+        __unexpected_attrs("linear", kwargs)
+
+    out = get_relay_op("matmul")(data, filter, transpose_b=True)
     res = None
 
     if isinstance(bias, tvm_expr.Constant):
@@ -1545,107 +1610,79 @@ def linear_converter(data,
         res = tvm_op.nn.bias_add(out, relay.squeeze(bias, axis=0))
 
     return res
+
+
 # ok
 
-def separable_conv_converter(data,
-                             plane_filter,
-                             point_filter,
-                             bias,
-                             border,
-                             padding,
-                             stride,
-                             dilation,
-                             groups,
-                             **kwargs):
+
+def separable_conv_converter(
+    data, plane_filter, point_filter, bias, border, padding, stride, dilation, groups, **kwargs
+):
     if kwargs:
-        __unexpected_attrs('separable_conv', kwargs)
+        __unexpected_attrs("separable_conv", kwargs)
 
     if isinstance(data, relay.Call):
         d_type = infer_type(data).checked_type.dtype
     else:
         d_type = data.type_annotation.dtype
 
-    filtered = conv_converter(data,
-                              plane_filter,
-                              tvm_expr.const(0, dtype=d_type),
-                              border,
-                              stride,
-                              padding,
-                              dilation,
-                              0)
+    filtered = conv_converter(
+        data, plane_filter, tvm_expr.const(0, dtype=d_type), border, stride, padding, dilation, 0
+    )
 
-    return conv_converter(filtered,
-                          point_filter,
-                          bias,
-                          'constant',
-                          [],
-                          [],
-                          [],
-                          groups)
+    return conv_converter(filtered, point_filter, bias, "constant", [], [], [], groups)
+
+
 # ok
 
-def separable_deconv_converter(data,
-                               plane_filter,
-                               point_filter,
-                               bias,
-                               border,
-                               padding,
-                               stride,
-                               dilation,
-                               output_shape,
-                               groups,
-                               **kwargs):
+
+def separable_deconv_converter(
+    data,
+    plane_filter,
+    point_filter,
+    bias,
+    border,
+    padding,
+    stride,
+    dilation,
+    output_shape,
+    groups,
+    **kwargs,
+):
     if kwargs:
-        __unexpected_attrs('separable_deconv', kwargs)
+        __unexpected_attrs("separable_deconv", kwargs)
 
     if isinstance(data, relay.Call):
         d_type = infer_type(data).checked_type.dtype
     else:
         d_type = data.type_annotation.dtype
 
-    filtered = deconv_converter(data,
-                                point_filter,
-                                tvm_expr.const(0, dtype=d_type),
-                                'constant',
-                                [],
-                                [],
-                                [],
-                                [],
-                                groups)
+    filtered = deconv_converter(
+        data, point_filter, tvm_expr.const(0, dtype=d_type), "constant", [], [], [], [], groups
+    )
 
-    return deconv_converter(filtered,
-                            plane_filter,
-                            bias,
-                            border,
-                            stride,
-                            padding,
-                            dilation,
-                            output_shape,
-                            0)
+    return deconv_converter(
+        filtered, plane_filter, bias, border, stride, padding, dilation, output_shape, 0
+    )
+
+
 # ok
 
-def max_pool_converter(data,
-                       size,
-                       border,
-                       padding,
-                       stride,
-                       dilation,
-                       **kwargs):
-    if kwargs:
-        __unexpected_attrs('max_pool', kwargs)
 
-    if border != 'constant':
-        print(f'Currently {border} border is not supported, used `constant` border')
+def max_pool_converter(data, size, border, padding, stride, dilation, **kwargs):
+    if kwargs:
+        __unexpected_attrs("max_pool", kwargs)
+
+    if border != "constant":
+        print(f"Currently {border} border is not supported, used `constant` border")
 
     dshape = infer_shape(data)
     rank = len(dshape)
 
     pool_size = _size_conv(size, rank)
-    strides = _stride_conv(stride, rank) if stride \
-        else (1,) * (rank - 2)
+    strides = _stride_conv(stride, rank) if stride else (1,) * (rank - 2)
 
-    dilation = dilation if dilation else (
-            (1,) * (rank - 2))
+    dilation = dilation if dilation else ((1,) * (rank - 2))
 
     if not padding:
         # padding is truncated to `conv style` (only active layers are present)
@@ -1653,41 +1690,37 @@ def max_pool_converter(data,
 
     pad = _padding_conv(padding, rank)
 
-    if border == 'constant':
+    if border == "constant":
         padding = [(0, 0), (0, 0)] + padding
         data = pad_converter(data, padding, border, tvm_expr.const(0.0))
         pad = (0, 0)
 
-    op = get_relay_op(dimension_picker('max_pool', dshape))
-    return op(data,
-              pool_size=pool_size,
-              strides=strides,
-              dilation=dilation,
-              padding=pad,
-              )
+    op = get_relay_op(dimension_picker("max_pool", dshape))
+    return op(
+        data,
+        pool_size=pool_size,
+        strides=strides,
+        dilation=dilation,
+        padding=pad,
+    )
+
+
 # ok
 
-def avg_pool_converter(data,
-                       size,
-                       border,
-                       padding,
-                       stride,
-                       dilation,
-                       **kwargs):
-    if kwargs:
-        __unexpected_attrs('avg_pool', kwargs)
 
-    if border not in ['constant', 'ignore']:
-        print(f'Currently {border} border is not supported, used `constant` border')
+def avg_pool_converter(data, size, border, padding, stride, dilation, **kwargs):
+    if kwargs:
+        __unexpected_attrs("avg_pool", kwargs)
+
+    if border not in ["constant", "ignore"]:
+        print(f"Currently {border} border is not supported, used `constant` border")
 
     dshape = infer_shape(data)
     rank = len(dshape)
     pool_size = _size_conv(size, rank)
-    strides = _stride_conv(stride, rank) if stride \
-        else (1,) * (rank - 2)
+    strides = _stride_conv(stride, rank) if stride else (1,) * (rank - 2)
 
-    dilation = dilation if dilation else (
-            (1,) * (rank - 2))
+    dilation = dilation if dilation else ((1,) * (rank - 2))
 
     # padding is truncated to `conv style` (only active layers are present)
     active_shape = dshape[2:]
@@ -1696,25 +1729,23 @@ def avg_pool_converter(data,
 
     pad = _padding_conv(padding, rank)
 
-    op = get_relay_op(dimension_picker('avg_pool', dshape))
-    return op(data,
-              pool_size=pool_size,
-              strides=strides,
-              dilation=dilation,
-              padding=pad,
-              count_include_pad=border != 'ignore'
-              )
+    op = get_relay_op(dimension_picker("avg_pool", dshape))
+    return op(
+        data,
+        pool_size=pool_size,
+        strides=strides,
+        dilation=dilation,
+        padding=pad,
+        count_include_pad=border != "ignore",
+    )
+
+
 # ok
 
-def rms_pool(data,
-             size,
-             border,
-             padding,
-             stride,
-             dilation,
-             **kwargs):
+
+def rms_pool(data, size, border, padding, stride, dilation, **kwargs):
     if kwargs:
-        __unexpected_attrs('rms_pool', kwargs)
+        __unexpected_attrs("rms_pool", kwargs)
 
     return sqrt_converter(
         avg_pool_converter(
@@ -1724,16 +1755,16 @@ def rms_pool(data,
             padding=padding,
             stride=stride,
             dilation=dilation,
-        ))
+        )
+    )
+
+
 # ok
 
 #   # Normalization
 
-def local_response_normalization_converter(data,
-                                           size,
-                                           alpha,
-                                           beta,
-                                           bias):
+
+def local_response_normalization_converter(data, size, alpha, beta, bias):
     axis = [i for i in range(len(size)) if size[i] > 1]
     if len(axis) == 1:
         axis = axis[0]
@@ -1741,95 +1772,90 @@ def local_response_normalization_converter(data,
         print("Multi axis LRN is not implemented properly, using first axis where size != 1")
         axis = axis[0]
     size = size[axis]
-    return get_relay_op('lrn')(data,
-                               size,
-                               axis,
-                               bias,
-                               alpha,
-                               beta)
+    return get_relay_op("lrn")(data, size, axis, bias, alpha, beta)
+
+
 # ok
 
-def local_mean_normalization_converter(data,
-                                       size,
-                                       **kwargs):
-    if kwargs:
-        __unexpected_attrs('local_mean_normalization', kwargs)
 
-    mean = box_converter(data, size, 'constant', [], [], [], normalize=True)
+def local_mean_normalization_converter(data, size, **kwargs):
+    if kwargs:
+        __unexpected_attrs("local_mean_normalization", kwargs)
+
+    mean = box_converter(data, size, "constant", [], [], [], normalize=True)
     return sub_converter(data, mean)
+
+
 # ok
 
-def local_variance_normalization_converter(data,
-                                           size,
-                                           bias,
-                                           epsilon,
-                                           **kwargs):
-    if kwargs:
-        __unexpected_attrs('local_variance_normalization', kwargs)
 
-    sigma = box_converter(sqr_converter(data), size, 'constant', [], [], [], normalize=True)
-    return div_converter(data,
-                         max_converter(add_converter(sqrt_converter(sigma), tvm_expr.const(bias)),
-                                       tvm_expr.const(epsilon)))
+def local_variance_normalization_converter(data, size, bias, epsilon, **kwargs):
+    if kwargs:
+        __unexpected_attrs("local_variance_normalization", kwargs)
+
+    sigma = box_converter(sqr_converter(data), size, "constant", [], [], [], normalize=True)
+    return div_converter(
+        data,
+        max_converter(
+            add_converter(sqrt_converter(sigma), tvm_expr.const(bias)), tvm_expr.const(epsilon)
+        ),
+    )
+
+
 # ok
 
-def local_contrast_normalization_converter(data,
-                                           size,
-                                           bias,
-                                           epsilon,
-                                           **kwargs):
+
+def local_contrast_normalization_converter(data, size, bias, epsilon, **kwargs):
     if kwargs:
-        __unexpected_attrs('local_contrast_normalization', kwargs)
+        __unexpected_attrs("local_contrast_normalization", kwargs)
 
     centered = local_mean_normalization_converter(data, size)
     return local_variance_normalization_converter(centered, size, bias, epsilon)
+
+
 # ok
 
-def l1_normalization_converter(data,
-                               axes,
-                               bias,
-                               epsilon,
-                               **kwargs):
+
+def l1_normalization_converter(data, axes, bias, epsilon, **kwargs):
     if kwargs:
-        __unexpected_attrs('l1_normalization', kwargs)
+        __unexpected_attrs("l1_normalization", kwargs)
 
     sigma = sum_reduce_converter(abs_converter(data), axes, False)
-    return div_converter(data, max_converter(add_converter(sigma, tvm_expr.const(bias)),
-                                             tvm_expr.const(epsilon)))
+    return div_converter(
+        data, max_converter(add_converter(sigma, tvm_expr.const(bias)), tvm_expr.const(epsilon))
+    )
+
+
 # ok
 
-def l2_normalization_converter(data,
-                               axes,
-                               bias,
-                               epsilon,
-                               **kwargs):
-    if kwargs:
-        __unexpected_attrs('l2_normalization', kwargs)
 
-    epsilon = epsilon ** 2
+def l2_normalization_converter(data, axes, bias, epsilon, **kwargs):
+    if kwargs:
+        __unexpected_attrs("l2_normalization", kwargs)
+
+    epsilon = epsilon**2
     if bias != 0.0:
-        print('Bias is not supported, assumed 0.0.')
+        print("Bias is not supported, assumed 0.0.")
     #     data = add_converter(data, tvm_expr.const(bias))
 
-    return get_relay_op('l2_normalize')(data, epsilon, axes)
+    return get_relay_op("l2_normalize")(data, epsilon, axes)
+
+
 # ok ish
 
-def batch_normalization_converter(data,
-                                  mean,
-                                  variance,
-                                  offset,
-                                  scale,
-                                  epsilon,
-                                  **kwargs):
+
+def batch_normalization_converter(data, mean, variance, offset, scale, epsilon, **kwargs):
     if kwargs:
-        __unexpected_attrs('batch_normalization', kwargs)
+        __unexpected_attrs("batch_normalization", kwargs)
 
     mean = squeeze_converter(mean, 0)
     variance = squeeze_converter(variance, 0)
     offset = squeeze_converter(offset, 0)
     scale = squeeze_converter(scale, 0)
 
-    return get_relay_op('batch_norm')(data, scale, offset, mean, variance, epsilon=epsilon)[0]
+    return get_relay_op("batch_norm")(data, scale, offset, mean, variance, epsilon=epsilon)[0]
+
+
 # ok
 
 #   # Misc ops
