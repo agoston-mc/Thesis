@@ -118,58 +118,59 @@ class NNEFConverter:
             else:
                 # every other operator can be grouped more easily,
                 # as it does not need self for conversion
-                self._set_literal_inputs(op)
-                self._set_parameter_span(op, op.name)
-                inputs = []
-                for ink, inv in op.inputs.items():
-                    if isinstance(inv, list):
-                        for i, linv in enumerate(inv):
-                            if linv in self._nodes.keys():
-                                inputs.append(self._nodes[linv])
-                            else:  # handle literal inputs
-                                name = f"{op.name}_{ink}_{i}"
-                                assert name in self._nodes, f"{name} has not been properly handled"
-                                inputs.append(self._nodes[name])
+                self._set_operator(op)
 
-                    else:
-                        if inv in self._nodes.keys():
-                            inputs.append(self._nodes[inv])
-                        else:  # handle literal inputs
-                            name = f"{op.name}_{ink}"
-                            assert name in self._nodes, f"{name} has not been properly handled"
-                            inputs.append(self._nodes[name])
+    def _set_operator(self, node):
+        self._set_literal_inputs(node)
+        self._set_parameter_span(node, node.name)
+        inputs = []
+        for ink, inv in node.inputs.items():
+            if isinstance(inv, list):
+                for i, linv in enumerate(inv):
+                    if linv in self._nodes.keys():
+                        inputs.append(self._nodes[linv])
+                    else:  # handle literal inputs
+                        name = f"{node.name}_{ink}_{i}"
+                        assert name in self._nodes, f"{name} has not been properly handled"
+                        inputs.append(self._nodes[name])
 
+            else:
+                if inv in self._nodes.keys():
+                    inputs.append(self._nodes[inv])
+                else:  # handle literal inputs
+                    name = f"{node.name}_{ink}"
+                    assert name in self._nodes, f"{name} has not been properly handled"
+                    inputs.append(self._nodes[name])
 
-                converted = self._get_relay_op_call(op.name, inputs, op.attribs)
+        converted = self._get_relay_node_call(node.name, inputs, node.attribs)
 
-                if not isinstance(converted, tvm_expr.TupleWrapper):
-                    outputs_num = 1
-                else:
-                    outputs_num = len(converted)
+        if not isinstance(converted, tvm_expr.TupleWrapper):
+            outputs_num = 1
+        else:
+            outputs_num = len(converted)
 
-                if outputs_num == 1:
-                    if not isinstance(converted, tvm_expr.TupleWrapper):
-                        converted = fold_constant(converted)
-                    else:
-                        converted = fold_constant(converted.astuple())
-                else:
-                    converted = tvm_expr.TupleWrapper(
-                        fold_constant(converted.astuple()), len(converted)
-                    )
+        if outputs_num == 1:
+            if not isinstance(converted, tvm_expr.TupleWrapper):
+                converted = fold_constant(converted)
+            else:
+                converted = fold_constant(converted.astuple())
+        else:
+            converted = tvm_expr.TupleWrapper(
+                fold_constant(converted.astuple()), len(converted)
+            )
 
-                converted = set_span(converted, op.name)
+        converted = set_span(converted, node.name)
 
-                if outputs_num == 1:
-                    # check if the singular ret val is a list of only one element
-                    ret_val = list(op.outputs.values())[0]
-                    if isinstance(ret_val, list):
-                        self._nodes[ret_val[0]] = converted
-                    else:
-                        self._nodes[ret_val] = converted
-                else:
-                    for i, out in zip(range(outputs_num), op.outputs["values"]):
-                        self._nodes[out] = converted[i]
-
+        if outputs_num == 1:
+            # check if the singular ret val is a list of only one element
+            ret_val = list(node.outputs.values())[0]
+            if isinstance(ret_val, list):
+                self._nodes[ret_val[0]] = converted
+            else:
+                self._nodes[ret_val] = converted
+        else:
+            for i, out in zip(range(outputs_num), node.outputs["values"]):
+                self._nodes[out] = converted[i]
     def _set_const(self, node):
         """Create a tvm.relay.Constant from a nnef constant tensor"""
         name = node.outputs["output"]
