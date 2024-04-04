@@ -340,7 +340,7 @@ def _get_converter_map():
 # TODO maybe should be replaced by independent not impl errors?
 def ndop(*args, **kwargs):
     # print(args, kwargs)
-    raise Exception("Not supported operator was called, please check for compatilibty")
+    raise Exception("Not supported operator was called, please check for compatibility")
 
 
 #   # Unary ops

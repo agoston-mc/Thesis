@@ -248,7 +248,7 @@ class NNEFConverter:
         if isinstance(val, int):
             return "int32", True
         if isinstance(val, str):
-            # the string val"s can be names of nodes in some of the cases
+            # the string vals can be names of nodes in some of the cases
             if isinstance(val, nnef.Identifier):
                 if val in self._nodes.keys():
                     node = self._nodes[val]
@@ -296,7 +296,7 @@ def from_nnef(
     conv_clss = NNEFConverter(freeze_vars)
     model = nnef.load_graph(model_path)
 
-    # fills in the nnef graph"s shape information
+    # fills in the nnef graph's shape information
     nnef.infer_shapes(model)
 
     return conv_clss.from_nnef(graph=model)
