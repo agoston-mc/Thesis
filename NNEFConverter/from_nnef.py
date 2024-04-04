@@ -221,13 +221,12 @@ class NNEFConverter:
 
         expr = self._nodes.get(name)
         if expr:
-            if isinstance(expr, relay.Constant):
-                if name not in self._consts:
-                    name = f"{node.name}_const"
             expr_with_span = set_span(expr, make_parameter_span([node_source_name, name]))
             self._nodes[name] = expr_with_span
             if name in self._inputs:
                 self._inputs[name] = expr_with_span
+            if isinstance(expr, relay.Constant):
+                self._consts[name] = expr_with_span
 
     def _get_relay_op_call(self, name, inputs, attrs):
         """Returns the tvm.Call equivalent to the nnef operator"""
