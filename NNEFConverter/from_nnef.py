@@ -60,7 +60,7 @@ class NNEFConverter:
         self._num_params = 0
         self._freeze_vars = freeze_vars
 
-    def from_nnef(self, graph: nnef.Graph) -> tuple[tvm.IRModule, dict]:
+    def from_nnef(self, graph: nnef.Graph): # -> tuple(tvm.IRModule, dict):
         """
         Convert an NNEF model into an equivalent TVM Relay IRModule.
 
@@ -143,7 +143,7 @@ class NNEFConverter:
                     assert name in self._nodes, f"{name} has not been properly handled"
                     inputs.append(self._nodes[name])
 
-        converted = self._get_relay_node_call(node.name, inputs, node.attribs)
+        converted = self._get_relay_op_call(node.name, inputs, node.attribs)
 
         if not isinstance(converted, tvm_expr.TupleWrapper):
             outputs_num = 1
@@ -271,7 +271,7 @@ class NNEFConverter:
 def from_nnef(
     model_path: os.PathLike,
     freeze_vars: bool = False,
-) -> tuple[IRModule, dict]:
+): # -> tuple[IRModule, dict]:
     """
     Convert an NNEF model into an equivalent TVM Relay IRModule.
 
