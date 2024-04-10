@@ -1,9 +1,27 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
 import os
 
 import numpy as np
 
+import _nnef
 import nnef
-from nnef_tools.execute import NNEFExecutor
+import nnef_tools.interpreter.pytorch as interpreter
 
 import tvm
 import tvm.testing
@@ -16,13 +34,15 @@ from tvm import relay
 graphs_dir = os.path.join("tests", "python", "frontend", "nnef", "outputs")
 
 
-def _read_tensor(filename):
-    with open(filename) as file:
-        return nnef.read_tensor(file)
+# def _read_tensor(filename):
+#     with open(filename) as file:
+#         return nnef.read_tensor(file)
 
 
 def get_nnef_outputs(path, inputs):
-    return NNEFExecutor(path, None, None)(inputs)[0]
+    ip = interpreter.Interpreter(path, None, None)
+    inputs = [inputs[tensor.name] for tensor in ip.input_details()]
+    return ip(inputs)
 
 
 def get_type(val):
@@ -44,16 +64,30 @@ def verify_model(
     atol=1e-5,
 ):
     path = os.path.join(graphs_dir, model_path)
-    graph = nnef.load_graph(path)
+    graph = nnef.load_graph(path, load_variables=False)
     nnef.infer_shapes(graph)
     inputs = {}
+    # generate inputs
     for inp in graph.inputs:
         intensor = graph.tensors[inp]
         shape = intensor.shape
         inputs[inp] = np.random.uniform(size=shape).astype(get_type(intensor.dtype))
-    outputs = get_nnef_outputs(path, inputs)
 
-    mod, params = relay.frontend.from_nnef(path)
+    # set graph parameters
+    for operation in graph.operations:
+        if operation.name == 'variable':
+            tensor_name = operation.outputs['output']
+
+            shape = operation.attribs['shape']
+
+            data = np.random.uniform(low=-1.0, size=shape).astype('float32')
+
+            tensor = graph.tensors[tensor_name]
+            graph.tensors[tensor_name] = _nnef.Tensor(tensor.name, tensor.dtype, shape, data, tensor.quantization)
+
+    outputs = get_nnef_outputs(graph, inputs)
+
+    mod, params = relay.frontend.from_nnef(graph)
 
     with tvm.transform.PassContext(opt_level=3):
         # dev = tvm.device(target, 0)
