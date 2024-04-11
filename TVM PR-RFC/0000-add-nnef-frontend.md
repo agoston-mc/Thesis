@@ -87,7 +87,8 @@ We are aware of the following projects that currently support importing NNEF mod
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-`-`
+- Whether we can use the nnef graph files as test cases,
+- Installation of NNEF and NNEF-Tools to the TVM CI Docker images
 
 # Future possibilities
 [future-possibilities]: #future-possibilities
