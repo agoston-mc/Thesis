@@ -82,6 +82,7 @@ We are aware of the following projects that currently support importing NNEF mod
 - https://github.com/sonos/tract
 - https://github.com/fragata-ai/arhat-nnef
 - https://rocm.docs.amd.com/projects/MIVisionX/en/latest/model_compiler/README.html
+- https://www.khronos.org/openvx/
 
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
