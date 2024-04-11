@@ -45,19 +45,26 @@ Based on this background, we proposed this RFC to add a PaddlePaddle frontend fo
 # Guide-level explanation
 [guide-level-explanation]: #guide-level-explanation
 
-Explain the proposal as if it was already included in the language and you were teaching it to a TVM user. 
+We are going to add an NNEF support, for that we can use either a NNEF model directory, or an `nnef.Graph` object 
+already loaded into memory.
+The conversion is done via the new frontend function
+```python
+relay.frontend.from_nnef(model, freeze_vars=False)
+```
+  - model: either a string, or PathLike to an NNEF model directory, or an `nnef.Graph` object.
+  - freeze_vars: optional bool, which sets whether the parameters should be considered variables or constants for optimisation
 
-That generally means:
+Example usages (assume we have a directory `inception_v1.nnef` with a complete NNEF Inception graph)
+```python
+import nnef
+from tvm import relay
 
-- Introducing new named concepts.
-- Explaining what the feature enables (hint: think in terms of examples).
-- If applicable, provide sample error messages, deprecation warnings, or migration guidance.
+model_path = 'path/to/model/inception_v1.nnef'
+# If modification is needed the graph can be imported with `nnef.load_graph` 
+graph = nnef.load_graph(model_path)
 
-For internal RFCs (e.g. for compiler internals), this section should focus on how core contributors s
-hould think about the change, and give examples of its concrete impact. 
-
-For policy RFCs, this section should provide an example-driven introduction to the policy, 
-  and explain its impact in concrete terms.
+mod, params = relay.frontend.from_nnef(graph)
+```
 
 # Reference-level explanation
 [reference-level-explanation]: #reference-level-explanation
