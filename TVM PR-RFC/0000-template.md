@@ -69,19 +69,19 @@ mod, params = relay.frontend.from_nnef(graph)
 # Reference-level explanation
 [reference-level-explanation]: #reference-level-explanation
 
-This is the technical portion of the RFC. Explain the design in sufficient detail that:
+As this RFC only adds a new frontend, no other features should be affected. 
 
-- Its interaction with other features is clear.
-- It is reasonably clear how the feature would be implemented.
-- Corner cases are dissected by example.
+The process of importing a NNEF model consists of:
 
-The section should return to the examples given in the previous section, 
-and explain more fully how the detailed proposal makes those examples work.
+- Loading an NNEF model into memory, if a model path was provided `nnef.load_graph` is used to get an `nnef.Graph` object.
+This is supported so the model can be used, or modified before conversion with methods provided for NNEF.
+- Converting the operations of the Graph, setting inputs, and reading parameters one by one.
+
 
 # Drawbacks
 [drawbacks]: #drawbacks
 
-Why should we *not* do this?
+Potential increase in time-cost of unit tests.
 
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
