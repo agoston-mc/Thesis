@@ -1,7 +1,3 @@
-- Feature Name: `Relay NNEF frontend`
-- Start Date: 2024-04-11
-- RFC PR: [apache/tvm-rfcs#0000](https://github.com/apache/tvm-rfcs/pull/0000)
-- GitHub Issue: [apache/tvm#0000](https://github.com/apache/tvm/issues/0000)
 
 # Add a Neural Network Exchange Format frontend to TVM
 
