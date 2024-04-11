@@ -59,7 +59,7 @@ As this RFC only adds a new frontend, no other features should be affected.
 The process of importing an NNEF model consists of:
 
 - Loading an NNEF model into memory, if a model path is provided, using `nnef.load_graph` function to get an `nnef.Graph` object.
-After this step the model may be modified before final conversion with functions provided for NNEF models.
+After this step the model may be modified with functions provided for NNEF models before final conversion to TVM.
 - Converting the operations of the Graph, setting inputs, and reading parameters one by one.
 
 
