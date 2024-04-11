@@ -6,40 +6,23 @@
 # Summary
 [summary]: #summary
 
-Add a Neural Network Exchange Format frontend to TVM.
+Add the Khronos Neural Network Exchange Format (NNEF) as a frontend to TVM.
 
 # Motivation
 [motivation]: #motivation
 
-Why are we doing this? What use cases does it support? What is the expected outcome?
+NNEF is an open, standardized format for neural network exchange developed by the Khronos Group since 2018 (https://www.khronos.org/nnef). It is aimed at deploying trained neural networks from deep learning frameworks to proprietary inference engines of neural network hardware vendors. Such inference engines often require an offline compilation step for running models more efficiently, hence hardware vendors are are looing into open source compiler stacks to be leveraged. On one hand, hardware vendors may integrate their hardware as a backend into TVM, while at the same time integrating NNEF as a frontend would allow vendors to use TVM as an end-to-end compilation tool starting from a standardized format.
 
+The Khronos Group also maintains a set of tools for handling NNEF models. Since NNEF is mainly a textual format, these include a parser (with C++ and Python interfaces), and conversion tools from other formats. NNEF supports conversion from models of various deep learning frameworks, including Caffe, TensorFlow (also Lite) and all those that support ONNX, such as PyTorch. Creating NNEF models is also possible manually by directly writing the model text file(s) (since NNEF is similar to a scripting language). Manually written models may even be executed or trained in deep learning frameworks (currently support for PyTorch exists).
 
-PaddlePaddle, an independent R&D deep learning platform in China, has been officially open-sourced to professional communities since 2016. It has been widely adopted by a wide range of sectors including manufacturing, agriculture, enterprise service, and so on while serving more than 2.3 million developers. With such advantages, PaddlePaddle has helped an increasing number of partners commercialize AI.
+For example, loading an NNEF model in Python is as simple as follows:
 
-Currently, PaddlePaddle has built a prosperous technological ecology, there are more than 500 models developed by official organization or outside developers, covering CV/NLP/OCR/Speech, refer to the following links for more details,
-
-- [PaddlePaddle/models](https://github.com/PaddlePaddle/models)
-- [PaddleDetection](https://github.com/PaddlePaddle/PaddleDetection)
-- [PaddleClas](https://github.com/PaddlePaddle/PaddleClas)
-- [PaddleSeg](https://github.com/PaddlePaddle/PaddleSeg)
-- [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)
-- [PaddleNLP](https://github.com/PaddlePaddle/PaddleNLP)
-- [DeepSpeech](https://github.com/PaddlePaddle/DeepSpeech)
-
-As of version 2.0, PaddlePaddle supports imperative programming like PyTorch. Furthermore, a mechanism of `Dynamic to Static` is provided to export a PaddlePaddle model to graph representation, which is more friendly for deployment. The following example code shows how to export a PaddlePaddle model,
-
-```
-import paddle
-import paddlehub
-model = hub.Module(name="resnet50_vd_imagenet_ssld")
-input_spec = paddle.static.InputSpec(
-    [1, 3, 224, 224], "float32", "image")
-paddle.jit.save(model, "model/infer", input_spec=[input_spec])
+```python
+import nnef
+graph = nnef.load_graph('example.nnef')
 ```
 
-PaddlePaddle's deployment is supported by Paddle Inference/Paddle Lite/OpenVINO/Tengine/Adlik now. We noticed that there are lots of developers converting models to ONNX format for the compatibility with TVM, but only a limited number of models are convertible due to lack of ONNX operators.  
-Based on this background, we proposed this RFC to add a PaddlePaddle frontend for TVM, improving usability for PaddlePaddle users and enhancing the compatibility between PaddlePaddle and TVM.
-
+The resulting graph object, containing tensors and operators can then be traversed and processed, for example converted into TVM representation, as done in this PR.
 
 
 # Guide-level explanation
