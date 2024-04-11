@@ -24,18 +24,20 @@ graph = nnef.load_graph('example.nnef')
 
 The resulting graph object, containing tensors and operators can then be traversed and processed, for example converted into TVM representation, as done in this PR.
 
+The NNEF tools also provide a simple C++ based reference implementation for NNEF models, whose main purpose is testing/debugging conversions, and serving as a reference for other more efficient inference backends. Furthermore, a PyTorch based interpreter is also supported, which is able to execute NNEF models via on/the-fly conversion to PyTorch calls, and can also be used as a (more efficient) reference.
+
 
 # Guide-level explanation
 [guide-level-explanation]: #guide-level-explanation
 
-We are going to add an NNEF support, for that we can use either a NNEF model directory, or an `nnef.Graph` object 
+We are going to add support for models in NNEF format. The model may be provided either as an NNEF model folder, or an `nnef.Graph` object 
 already loaded into memory.
 The conversion is done via the new frontend function
 ```python
 relay.frontend.from_nnef(model, freeze_vars=False)
 ```
-  - model: either a string, or PathLike to an NNEF model directory, or an `nnef.Graph` object.
-  - freeze_vars: optional bool, which sets whether the parameters should be considered variables or constants for optimisation
+  - model: either a string / PathLike to an NNEF model folder, or an `nnef.Graph` object.
+  - freeze_vars: optional bool, which sets whether the parameters should be considered variables or constants for optimization
 
 Example usages (assume we have a directory `inception_v1.nnef` with a complete NNEF Inception graph)
 ```python
@@ -54,10 +56,10 @@ mod, params = relay.frontend.from_nnef(graph)
 
 As this RFC only adds a new frontend, no other features should be affected. 
 
-The process of importing a NNEF model consists of:
+The process of importing an NNEF model consists of:
 
-- Loading an NNEF model into memory, if a model path was provided `nnef.load_graph` is used to get an `nnef.Graph` object.
-This is supported so the model can be used, or modified before conversion with methods provided for NNEF.
+- Loading an NNEF model into memory, if a model path is provided, using `nnef.load_graph` function to get an `nnef.Graph` object.
+After this step the model may be modified before final conversion with functions provided for NNEF models.
 - Converting the operations of the Graph, setting inputs, and reading parameters one by one.
 
 
@@ -70,18 +72,16 @@ Potential increase in time-cost of unit tests.
 [rationale-and-alternatives]: #rationale-and-alternatives
 
 The frontend of NNEF is similar to that of ONNX, PyTorch, and TensorFlow. 
-Currently, as NNEF does not have an official compiler, the workflow with NNEF graphs is rather complicated, 
-possible through conversion to other models. 
+Currently, as NNEF does not have a publicly available efficient compiler, NNEF models can only be tested via the simple C++ reference implementation.
 
 # Prior art
 [prior-art]: #prior-art
 
-These are the projects currently supporting with NNEF:
+We are aware of the following projects that currently support importing NNEF models:
 
 - https://github.com/sonos/tract
 - https://github.com/fragata-ai/arhat-nnef
 - https://rocm.docs.amd.com/projects/MIVisionX/en/latest/model_compiler/README.html
-
 
 
 # Unresolved questions
