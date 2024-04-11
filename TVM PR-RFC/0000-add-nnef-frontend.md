@@ -92,5 +92,6 @@ We are aware of the following projects that currently support importing NNEF mod
 # Future possibilities
 [future-possibilities]: #future-possibilities
 
-We will be working on supporting the next generation of NNEF as well, while some NNEF methods are not supported by 
-this frontend, they were deemed not necessary as they are not widely used, if needed, they can be implemented as well.
+The Khronos Groups is actively working on the next major update to the NNEF format, whose main purpose is to increase model coverage by adding support for dynamic models and custom operators. In the latter case, more involved compilation of models carries even more potential, so we plan to add support for the next generation as well.
+
+Support for some NNEF operators would only be possible through more complex mapping to a sequence of TVM operators, and the less widely used ones were not the focus of this initial release. We may add support to such operators in the future if required.
