@@ -78,6 +78,7 @@ The frontend of NNEF is similar to that of ONNX, PyTorch, and TensorFlow, adding
 
 We are aware of the following projects that currently support importing NNEF models:
 
+- https://aimotive.com/aiware
 - https://github.com/sonos/tract
 - https://github.com/fragata-ai/arhat-nnef
 - https://rocm.docs.amd.com/projects/MIVisionX/en/latest/model_compiler/README.html
