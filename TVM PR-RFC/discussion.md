@@ -25,7 +25,7 @@ The frontend of NNEF is similar to that of ONNX, PyTorch, and TensorFlow, adding
 
 # Current progress
 
-The current development has the majority of the operations converted, with the remaining operations considered low priority, and will not be currently supported.
+The current development has the majority of the operations(97) converted, with the remaining operations considered low priority, and will not be currently supported.
 
 Test cases have been written to cover the finished operators, and the converter has been tested on complete networks with success. 
 
