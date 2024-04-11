@@ -64,7 +64,7 @@ def _size_conv(size, rank):
             return size
         if len(size) == 3:
             assert (
-                size[0] == 1 and size[1] == 1
+                    size[0] == 1 and size[1] == 1
             ), "Incorrect window dimensions, first two dimensions must be 1"
             return size[2]
     if rank == 4:
@@ -72,7 +72,7 @@ def _size_conv(size, rank):
             return size
         if len(size) == 4:
             assert (
-                size[0] == 1 and size[1] == 1
+                    size[0] == 1 and size[1] == 1
             ), "Incorrect window dimensions, first two dimensions must be 1"
             return size[2:]
     if rank == 5:
@@ -80,7 +80,7 @@ def _size_conv(size, rank):
             return size
         if len(size) == 5:
             assert (
-                size[0] == 1 and size[1] == 1
+                    size[0] == 1 and size[1] == 1
             ), "Incorrect window dimensions, first two dimensions must be 1"
             return size[2:]
 
@@ -95,7 +95,7 @@ def _stride_conv(stride, rank):
         # {pool style} :: [N, C, s] -> asrt N,C == 1; [s]
         if len(stride) == 3:
             assert (
-                stride[0] == 1 and stride[1] == 1
+                    stride[0] == 1 and stride[1] == 1
             ), "Not supported stride dimensions, first two dimensions must be 1"
             return stride[2:]
     if rank == 4:
@@ -105,7 +105,7 @@ def _stride_conv(stride, rank):
         # {pool style} :: [N, C, sh, sw] -> asrt N,C == 1; [sh, sw]
         if len(stride) == 4:
             assert (
-                stride[0] == 1 and stride[1] == 1
+                    stride[0] == 1 and stride[1] == 1
             ), "Not supported stride dimensions, first two dimensions must be 1"
             return stride[2:]
     if rank == 5:
@@ -115,7 +115,7 @@ def _stride_conv(stride, rank):
         # {pool style} :: [N, C, sd, sh, sw] -> asrt N,C == 1; [sd, sh, sw]
         if len(stride) == 5:
             assert (
-                stride[0] == 1 and stride[1] == 1
+                    stride[0] == 1 and stride[1] == 1
             ), "Not supported stride dimensions, first two dimensions must be 1"
             return stride[2:]
     raise ValueError(f"Unexpected stride in {rank - 2}D, got {len(stride)}: {stride}")
@@ -228,12 +228,10 @@ def _calculate_nnef_padding_deconv(data_sh, strides, kernel_active_sh, dilation,
 
 
 def __unexpected_attrs(op, kwargs):
-    print(
+    raise NotImplementedError(
         f"{op} received unexpected attributes(s), possibly mismatched versions. "
-        "Attributes(s) ignored:"
+        "Attributes(s) ignored: " + ', '.join(f"{k} := {v}" for k, v in kwargs.items())
     )
-    for k, v in kwargs.items():
-        print(f"\t{k} := {v}")
 
 
 # Conversion map, operator functions
@@ -369,7 +367,6 @@ def _get_converter_map():
 
 
 # not implemented ops
-# TODO maybe should be replaced by independent not impl errors?
 def ndop(*args, **kwargs):
     # print(args, kwargs)
     raise Exception("Not supported operator was called, please check for compatibility")
@@ -821,7 +818,7 @@ def conv_converter(data, kernel, bias, border, stride, padding, dilation, groups
 
 
 def deconv_converter(
-    data, kernel, bias, border, stride, padding, dilation, output_shape, groups, **kwargs
+        data, kernel, bias, border, stride, padding, dilation, output_shape, groups, **kwargs
 ):
     """Deconvolution converter, using convxd_transpose
     skips bias if it's 0.0 (no bias)"""
@@ -858,7 +855,6 @@ def deconv_converter(
         if output_shape
         else (0, 0)
     )
-    # todo test if that can be larger for nnef?
 
     op = get_relay_op(dimension_picker("conv", kernel_shape, suffix="_transpose"))
     deconv_out = op(
@@ -911,7 +907,7 @@ def box_converter(data, size, border, padding, stride, dilation, normalize, **kw
 
 
 def debox_converter(
-    data, size, border, padding, stride, dilation, normalize, output_shape, **kwargs
+        data, size, border, padding, stride, dilation, normalize, output_shape, **kwargs
 ):
     """Debox operator converter,
     inverse of box, equal to deconv with constant filter"""
@@ -1163,7 +1159,7 @@ def reshape_converter(data, shape, axis_start, axis_count, **kwargs):
         newshape = dshape[:axis_start] + shape
     else:
         newshape = dshape
-        newshape[axis_start : axis_start + axis_count] = shape
+        newshape[axis_start: axis_start + axis_count] = shape
 
     return get_relay_op("reshape")(data, newshape)
 
@@ -1419,7 +1415,7 @@ def gelu_converter(data, **kwargs):
         __unexpected_attrs("gelu", kwargs)
 
     return data * (
-        tvm_expr.const(0.5) + tvm_op.erf(data * tvm_expr.const(0.5**0.5)) * tvm_expr.const(0.5)
+            tvm_expr.const(0.5) + tvm_op.erf(data * tvm_expr.const(0.5 ** 0.5)) * tvm_expr.const(0.5)
     )
 
 
@@ -1474,7 +1470,7 @@ def linear_converter(data, _filter, bias, **kwargs):
 
 
 def separable_conv_converter(
-    data, plane_filter, point_filter, bias, border, padding, stride, dilation, groups, **kwargs
+        data, plane_filter, point_filter, bias, border, padding, stride, dilation, groups, **kwargs
 ):
     """Separable convolution converter"""
     if kwargs:
@@ -1493,17 +1489,17 @@ def separable_conv_converter(
 
 
 def separable_deconv_converter(
-    data,
-    plane_filter,
-    point_filter,
-    bias,
-    border,
-    padding,
-    stride,
-    dilation,
-    output_shape,
-    groups,
-    **kwargs,
+        data,
+        plane_filter,
+        point_filter,
+        bias,
+        border,
+        padding,
+        stride,
+        dilation,
+        output_shape,
+        groups,
+        **kwargs,
 ):
     """Separable deconvolution converter"""
     if kwargs:
@@ -1673,7 +1669,7 @@ def l2_normalization_converter(data, axes, bias, epsilon, **kwargs):
     if kwargs:
         __unexpected_attrs("l2_normalization", kwargs)
 
-    epsilon = epsilon**2
+    epsilon = epsilon ** 2
     if bias != 0.0:
         print("Bias is not supported, assumed 0.0.")
     #     data = add_converter(data, tvm_expr.const(bias))
@@ -1695,6 +1691,5 @@ def batch_normalization_converter(data, mean, variance, offset, scale, epsilon, 
     scale = squeeze_converter(scale, 0)
 
     return get_relay_op("batch_norm")(data, scale, offset, mean, variance, epsilon=epsilon)[0]
-
 
 #   # Misc ops
