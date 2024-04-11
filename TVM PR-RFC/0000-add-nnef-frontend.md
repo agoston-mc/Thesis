@@ -87,8 +87,8 @@ We are aware of the following projects that currently support importing NNEF mod
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-- Whether we can use the nnef graph files as test cases,
-- Installation of NNEF and NNEF-Tools to the TVM CI Docker images
+- Whether we can use the NNEF models, text files (e.g `graph.nnef`) as inputs to the test cases, as currently our test cases use separate model folders with prewritten model definitions, and we only generate the inputs for those. The 'tests/python/frontend/nnef/models' folder contains our test cases.
+- Installation of NNEF and NNEF-Tools to the TVM CI Docker images. We need the Docker images to contain an install script which uses git to add NNEF to the CI environment, also with lint exceptions to `.nnef` files. The modifications are possible as tested, just need a Docker image rebuild.   
 
 # Future possibilities
 [future-possibilities]: #future-possibilities
