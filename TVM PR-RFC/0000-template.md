@@ -58,9 +58,10 @@ Why should we *not* do this?
 [prior-art]: #prior-art
 
 NNEF usages:
-https://github.com/sonos/tract
-https://github.com/fragata-ai/arhat-nnef
-https://rocm.docs.amd.com/projects/MIVisionX/en/latest/model_compiler/README.html
+
+- https://github.com/sonos/tract
+- https://github.com/fragata-ai/arhat-nnef
+- https://rocm.docs.amd.com/projects/MIVisionX/en/latest/model_compiler/README.html
 
 
 Discuss prior art, both the good and the bad, in relation to this proposal.
