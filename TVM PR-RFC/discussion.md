@@ -21,8 +21,8 @@ The Khronos Group also maintains a set of tools for handling NNEF models. Since 
 [rationale-and-alternatives]: #rationale-and-alternatives
 
 The frontend of NNEF is similar to that of ONNX, PyTorch, and TensorFlow. 
-Currently, as NNEF does not have an official compiler, the workflow with NNEF graphs is rather complicated, 
-possible through conversion to other models. 
+Currently, as NNEF does not have a publicly available efficient compiler, NNEF models can only be tested via the simple C++ reference implementation.
+
 
 # Current progress
 
