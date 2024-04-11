@@ -5,7 +5,7 @@
 
 # Add a Neural Network Exchange Format frontend to TVM
 
-Hi, we are working on creating a NNEF frontend for TVM relay. 
+Hi, we are developers from aiMotive, member company of the Khronos Group (https://www.khronos.org), working on creating an NNEF frontend for TVM relay. 
 
 # Motivation
 [motivation]: #motivation
@@ -20,8 +20,7 @@ The Khronos Group also maintains a set of tools for handling NNEF models. Since 
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
 
-The frontend of NNEF is similar to that of ONNX, PyTorch, and TensorFlow. 
-Currently, as NNEF does not have a publicly available efficient compiler, NNEF models can only be tested via the simple C++ reference implementation.
+The frontend of NNEF is similar to that of ONNX, PyTorch, and TensorFlow, adding it would increase the number of model formats that TVM can process.
 
 
 # Current progress
