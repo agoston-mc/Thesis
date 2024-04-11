@@ -71,19 +71,39 @@ def verify_model(
     for inp in graph.inputs:
         intensor = graph.tensors[inp]
         shape = intensor.shape
-        inputs[inp] = np.random.uniform(size=shape).astype(get_type(intensor.dtype))
+        if any(exc in model_path for exc in ["log", "sqrt", "pow", "batch_norm"]):
+            low = 0.0
+        else:
+            low = -1.0
+        high = 1.0
+        if "acosh" in model_path:
+            high = 2.0
+            low = 1.0
+        if intensor.dtype == "scalar":
+            inputs[inp] = np.random.uniform(low=low, high=high, size=shape).astype("float32")
+        elif intensor.dtype == "integer":
+            inputs[inp] = np.random.randint(0, 64, shape)
+        elif intensor.dtype == "logical":
+            inputs[inp] = np.random.binomial(1, 0.5, shape).astype("bool")
+        elif intensor.dtype == "string":
+            inputs[inp] = np.random.uniform(low=low, high=high, size=shape).astype("string")
 
     # set graph parameters
     for operation in graph.operations:
-        if operation.name == 'variable':
-            tensor_name = operation.outputs['output']
+        if operation.name == "variable":
+            tensor_name = operation.outputs["output"]
 
-            shape = operation.attribs['shape']
+            shape = operation.attribs["shape"]
 
-            data = np.random.uniform(low=-1.0, size=shape).astype('float32')
+            # if operation.attribs["dtype"] == "scalar":
+            # else:
+
+            data = np.random.uniform(low=-1.0, size=shape).astype("float32")
 
             tensor = graph.tensors[tensor_name]
-            graph.tensors[tensor_name] = _nnef.Tensor(tensor.name, tensor.dtype, shape, data, tensor.quantization)
+            graph.tensors[tensor_name] = _nnef.Tensor(
+                tensor.name, tensor.dtype, shape, data, tensor.quantization
+            )
 
     outputs = get_nnef_outputs(graph, inputs)
 
