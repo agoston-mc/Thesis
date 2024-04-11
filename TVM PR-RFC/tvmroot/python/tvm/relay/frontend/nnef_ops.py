@@ -367,7 +367,6 @@ def _get_converter_map():
 
 
 # not implemented ops
-# TODO maybe should be replaced by independent not impl errors?
 def ndop(*args, **kwargs):
     # print(args, kwargs)
     raise Exception("Not supported operator was called, please check for compatibility")
@@ -856,7 +855,6 @@ def deconv_converter(
         if output_shape
         else (0, 0)
     )
-    # todo test if that can be larger for nnef?
 
     op = get_relay_op(dimension_picker("conv", kernel_shape, suffix="_transpose"))
     deconv_out = op(
