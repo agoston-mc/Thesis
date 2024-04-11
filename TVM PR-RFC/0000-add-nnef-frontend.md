@@ -71,8 +71,7 @@ Potential increase in time-cost of unit tests.
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
 
-The frontend of NNEF is similar to that of ONNX, PyTorch, and TensorFlow. 
-Currently, as NNEF does not have a publicly available efficient compiler, NNEF models can only be tested via the simple C++ reference implementation.
+The frontend of NNEF is similar to that of ONNX, PyTorch, and TensorFlow, adding it would increase the number of model formats that TVM can process.
 
 # Prior art
 [prior-art]: #prior-art
@@ -83,12 +82,11 @@ We are aware of the following projects that currently support importing NNEF mod
 - https://github.com/fragata-ai/arhat-nnef
 - https://rocm.docs.amd.com/projects/MIVisionX/en/latest/model_compiler/README.html
 
-
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-- Whether we can use the NNEF models, text files (e.g `graph.nnef`) as inputs to the test cases, as currently our test cases use separate model folders with prewritten model definitions, and we only generate the inputs for those. The 'tests/python/frontend/nnef/models' folder contains our test cases.
-- Installation of NNEF and NNEF-Tools to the TVM CI Docker images. We need the Docker images to contain an install script which uses git to add NNEF to the CI environment, also with lint exceptions to `.nnef` files. The modifications are possible as tested, just need a Docker image rebuild.   
+- Whether test cases can make use of pre-written the NNEF models, (text files with NNEF syntax, such as `graph.nnef`) as a starting point. Currently our test cases use separate model folders with prewritten model definitions, and we only generate the inputs for those. The 'tests/python/frontend/nnef/models' folder contains these test cases.
+- Installation of NNEF and NNEF-Tools to the TVM CI Docker images. We need the Docker images to contain an install script which uses git to add NNEF to the CI environment, also with lint exceptions to `.nnef` files (mentioned in the previous point). It seems to work when the docker images are rebuilt from source with the install scripts added, but we are not sure if it okay.
 
 # Future possibilities
 [future-possibilities]: #future-possibilities
