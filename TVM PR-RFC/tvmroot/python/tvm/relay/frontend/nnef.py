@@ -17,9 +17,9 @@
 
 """NNEF: Neural Network Exchange Format frontend for TVM relay"""
 import os
+import typing
 import nnef
 import numpy as np
-import typing
 
 import tvm
 from tvm import relay
