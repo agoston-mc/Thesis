@@ -21,7 +21,7 @@ import nnef
 import numpy as np
 import typing
 
-# import tvm
+import tvm
 from tvm import relay
 from tvm.ir import IRModule
 from tvm.relay import expr as tvm_expr
@@ -78,7 +78,7 @@ class NNEFConverter:
         self._num_params = 0
         self._freeze_vars = freeze_vars
 
-    def from_nnef(self, graph: nnef.Graph):  # -> tuple(tvm.IRModule, dict):
+    def from_nnef(self, graph: nnef.Graph) -> typing.Tuple[tvm.IRModule, dict]:
         """
         Convert an NNEF model into an equivalent TVM Relay IRModule.
 

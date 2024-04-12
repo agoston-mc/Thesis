@@ -287,7 +287,7 @@ class NNEFConverter:
 
 
 def from_nnef(
-    model,
+    model: typing.Union[str, os.PathLike, nnef.Graph],
     freeze_vars: bool = False,
 ) -> typing.Tuple[IRModule, dict]:
     """
