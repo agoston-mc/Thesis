@@ -95,10 +95,8 @@ def verify_model(
 
             shape = operation.attribs["shape"]
 
-            if operation.attribs["dtype"] == "scalar":
-                assert False, "scal"
-            else:
-                assert False, "nonfl"
+            assert operation.dtype == 'scalar', \
+                f'variable of type {operation.dtype} is not supported, please update verify_model'
 
             data = np.random.uniform(low=-1.0, size=shape).astype("float32")
 
