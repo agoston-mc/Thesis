@@ -30,4 +30,5 @@ Test cases have been written to cover the finished operators, and the converter 
 [future-possibilities]: #future-possibilities
 
 The Khronos Groups is actively working on the next major update to the NNEF format, whose main purpose is to increase model coverage by adding support for dynamic models and custom operators. In the latter case, more involved compilation of models carries even more potential, so we plan to add support for the next generation as well.
+
 Support for some NNEF operators would only be possible through more complex mapping to a sequence of TVM operators, and the less widely used ones were not the focus of this initial release. We may add support to such operators in the future if required.
