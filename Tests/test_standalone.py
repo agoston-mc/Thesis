@@ -59,11 +59,11 @@ def get_type(val):
 
 
 def verify_model(
-    model_path,
-    target,
-    device,
-    rtol=1e-5,
-    atol=1e-5,
+        model_path,
+        target,
+        device,
+        rtol=1e-5,
+        atol=1e-5,
 ):
     path = os.path.join(graphs_dir, model_path)
     graph = nnef.load_graph(path, load_variables=False)
@@ -446,6 +446,21 @@ def test_ats_l1_normalization(target, dev):
 @tvm.testing.parametrize_targets
 def test_ats_l2_normalization(target, dev):
     verify_model("l2_normalization", target, dev, rtol=1e-5, atol=1e-5)
+
+
+@tvm.testing.parametrize_targets
+def test_cts_pad_0_1_reflect():
+    verify_model("pad_0-1_reflect", rtol=1e-5, atol=1e-5)
+
+
+@tvm.testing.parametrize_targets
+def test_cts_pad_1_0_reflect():
+    verify_model("pad_1-0_reflect", rtol=1e-5, atol=1e-5)
+
+
+@tvm.testing.parametrize_targets
+def test_cts_pad_1_1_reflect():
+    verify_model("pad_1-1_reflect", rtol=1e-5, atol=1e-5)
 
 
 # GENERATED CASES START
