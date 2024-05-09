@@ -213,19 +213,6 @@ class NNEFConverter:
             )
             self._params[tensor.name] = tens_data
 
-    def _set_literal_inputs(self, node):
-        """Checks if node has literal inputs and saves them into a tvm.relay.Constant.
-        naming as {node.name}_{input field name}"""
-        for field_name, value in node.inputs.items():
-            if isinstance(value, list):
-                for v in value:
-                    if v not in self._nodes.keys():
-                        self._nodes[f"{node.name}_{v}"] = tvm_expr.const(v)
-
-            else:
-                if value not in self._nodes.keys():
-                    self._nodes[f"{node.name}_{field_name}"] = tvm_expr.const(value)
-
     def _set_parameter_span(self, node, node_source_name):
         for field_name, name in node.inputs.items():
             if isinstance(name, list):
@@ -259,36 +246,23 @@ class NNEFConverter:
             )
         return call
 
-    def _infer_type(self, val):
-        if isinstance(val, bool):
-            return "bool", True
-        if isinstance(val, float):
-            return "float32", True
-        if isinstance(val, int):
-            return "int32", True
-        if isinstance(val, str):
-            # the string vals can be names of nodes in some of the cases
-            if isinstance(val, nnef.Identifier):
-                if val in self._nodes.keys():
-                    node = self._nodes[val]
-                    if isinstance(node, tvm_expr.Var):
-                        return node.type_annotation.dtype, False
-                    if isinstance(node, tvm_expr.Constant):
-                        return node.data.dtype, False
-                    if isinstance(node, tvm_expr.Call):
-                        return infer_type(node).checked_type.dtype, False
-                raise Exception(
-                    f"{val} has not been loaded into the model "
-                    "but it should have been, as a var or call."
-                )
-            return "string", True
+    def _set_literal_inputs(self, node):
+        """Checks if node has literal inputs and saves them into a tvm.relay.Constant.
+        naming as {node.name}_{input field name}"""
+        for field_name, value in node.inputs.items():
+            if isinstance(value, list):
+                for v in value:
+                    if v not in self._nodes.keys():
+                        self._nodes[f"{node.name}_{v}"] = tvm_expr.const(v)
 
-        raise TypeError(f'Value "{val}" is not a recognized type')
+            else:
+                if value not in self._nodes.keys():
+                    self._nodes[f"{node.name}_{field_name}"] = tvm_expr.const(value)
 
 
 def from_nnef(
-    model: typing.Union[str, os.PathLike, nnef.Graph],
-    freeze_vars: bool = False,
+        model: typing.Union[str, os.PathLike, nnef.Graph],
+        freeze_vars: bool = False,
 ) -> typing.Tuple[IRModule, dict]:
     """
     Convert an NNEF model into an equivalent TVM Relay IRModule.
