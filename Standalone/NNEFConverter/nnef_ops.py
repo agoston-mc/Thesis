@@ -57,8 +57,6 @@ def dimension_picker(prefix, kernel_shape, suffix=""):
 
 
 def _size_conv(size, rank):
-    # window of size (DH)W is only possible when it is checked outside,
-    # which is needed for alternative solution
     if rank == 3:
         if len(size) == 1:
             return size
@@ -140,7 +138,6 @@ def _padding_conv(padding, rank, keepdims=False):
                     return padding
 
         # 2D
-
         if rank == 4:
             # {conv style} :: [(u,d),(l,r)] -> (u, l, d, r)
             if len(padding) == 2:
@@ -162,7 +159,6 @@ def _padding_conv(padding, rank, keepdims=False):
                     return padding
 
         # 3D
-
         if rank == 5:
             # {conv style} :: [(f,b),(u,d),(l,r)] -> (f, u, l, b, d, r)
             if len(padding) == 3:
