@@ -1,1 +1,1 @@
-from . import from_nnef
+from .from_nnef import from_nnef

@@ -57,8 +57,6 @@ def dimension_picker(prefix, kernel_shape, suffix=""):
 
 
 def _size_conv(size, rank):
-    # window of size (DH)W is only possible when it is checked outside,
-    # which is needed for alternative solution
     if rank == 3:
         if len(size) == 1:
             return size
@@ -140,7 +138,6 @@ def _padding_conv(padding, rank, keepdims=False):
                     return padding
 
         # 2D
-
         if rank == 4:
             # {conv style} :: [(u,d),(l,r)] -> (u, l, d, r)
             if len(padding) == 2:
@@ -162,7 +159,6 @@ def _padding_conv(padding, rank, keepdims=False):
                     return padding
 
         # 3D
-
         if rank == 5:
             # {conv style} :: [(f,b),(u,d),(l,r)] -> (f, u, l, b, d, r)
             if len(padding) == 3:
@@ -926,6 +922,7 @@ def debox_converter(
         kernel = relay.full(tvm_op.const(1 / math.prod(size[2:]), d_type), size, d_type)
     else:
         kernel = relay.ones(size, d_type)
+
     out = deconv_converter(
         data,
         kernel,
@@ -981,15 +978,12 @@ def nearest_upsample_converter(data, factor, **kwargs):
     if kwargs:
         __unexpected_attrs("nearest_upsample", kwargs)
 
-    # conversion from nn.upsampling to image.resizexd, re: discuss:11650
-    #
     dshape = infer_shape(data)
     new_size = [d * f for d, f in zip(dshape[2:], factor)]
     return get_relay_op(dimension_picker("resize", dshape))(
         data,
         new_size,
         method="nearest_neighbor",
-        # coordinate_transformation_mode="asymmetric",
         rounding_method="round",
     )
 
@@ -1535,8 +1529,8 @@ def max_pool_converter(data, size, border, padding, stride, dilation, **kwargs):
 
     dilation = dilation if dilation else ((1,) * (rank - 2))
 
+    # padding is truncated to `conv style` (only active layers are present)
     if not padding:
-        # padding is truncated to `conv style` (only active layers are present)
         padding = _calculate_nnef_padding(dshape[2:], strides, pool_size, dilation)
 
     pad = _padding_conv(padding, rank)
@@ -1566,6 +1560,7 @@ def avg_pool_converter(data, size, border, padding, stride, dilation, **kwargs):
 
     dshape = infer_shape(data)
     rank = len(dshape)
+
     pool_size = _size_conv(size, rank)
     strides = _stride_conv(stride, rank) if stride else (1,) * (rank - 2)
 
@@ -1675,9 +1670,6 @@ def l2_normalization_converter(data, axes, bias, epsilon, **kwargs):
     #     data = add_converter(data, tvm_expr.const(bias))
 
     return get_relay_op("l2_normalize")(data, epsilon, axes)
-
-
-# ok ish
 
 
 def batch_normalization_converter(data, mean, variance, offset, scale, epsilon, **kwargs):

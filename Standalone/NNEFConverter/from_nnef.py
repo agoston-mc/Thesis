@@ -26,7 +26,7 @@ from tvm import relay
 from tvm.ir import IRModule
 from tvm.relay import expr as tvm_expr
 from tvm.relay import analysis, function
-from tvm.relay.frontend.common import new_var, fold_constant, set_span, infer_type
+from tvm.relay.frontend.common import new_var, fold_constant, set_span
 
 from .nnef_ops import _get_converter_map
 

@@ -27,16 +27,8 @@ import tvm
 import tvm.testing
 from tvm import relay
 
-# from tvm.contrib import graph_executor
-# from relay.utils.tag_span import _create_span, _set_span, _verify_structural_equal_with_span
 
-
-graphs_dir = os.path.join("tests", "python", "frontend", "nnef", "outputs")
-
-
-# def _read_tensor(filename):
-#     with open(filename) as file:
-#         return nnef.read_tensor(file)
+graphs_dir = os.path.join("tests", "python", "frontend", "nnef", "cases")
 
 
 def get_nnef_outputs(path, inputs):
@@ -447,17 +439,17 @@ def test_ats_l2_normalization(target, dev):
 
 
 @tvm.testing.parametrize_targets
-def test_cts_pad_0_1_reflect():
+def test_ats_pad_0_1_reflect():
     verify_model("pad_0-1_reflect", rtol=1e-5, atol=1e-5)
 
 
 @tvm.testing.parametrize_targets
-def test_cts_pad_1_0_reflect():
+def test_ats_pad_1_0_reflect():
     verify_model("pad_1-0_reflect", rtol=1e-5, atol=1e-5)
 
 
 @tvm.testing.parametrize_targets
-def test_cts_pad_1_1_reflect():
+def test_ats_pad_1_1_reflect():
     verify_model("pad_1-1_reflect", rtol=1e-5, atol=1e-5)
 
 
