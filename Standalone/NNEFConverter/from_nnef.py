@@ -286,7 +286,7 @@ def from_nnef(
     params : dict of str to tvm.nd.NDArray
         The parameter dictionary to be used
     """
-    conv_clss = NNEFConverter(freeze_vars)
+    conv_cls = NNEFConverter(freeze_vars)
 
     if not isinstance(model, nnef.Graph):
         model = nnef.load_graph(model)
@@ -294,4 +294,4 @@ def from_nnef(
     # fills in the nnef graph's shape information
     nnef.infer_shapes(model)
 
-    return conv_clss.from_nnef(graph=model)
+    return conv_cls.from_nnef(graph=model)
