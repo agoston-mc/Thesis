@@ -2,3 +2,4 @@
 /nnef-cts/outputs/
 /build/
 *.egg-info
+compiled_lib.so
