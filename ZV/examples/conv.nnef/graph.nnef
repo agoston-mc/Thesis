@@ -1,0 +1,8 @@
+version 1.0;
+
+graph G ( input ) -> ( output ) {
+    input = external<scalar>(shape = [1,2,8,8]);
+    kernel = variable<scalar>(shape = [4,2,3,3], label= "kernel");
+    bias = variable<scalar>(shape = [1,4], label= "bias");
+    output = conv(input, kernel, bias);
+}
